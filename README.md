@@ -78,3 +78,9 @@ Nach erfolgreichem Durchlauf findest du das fertige Dokument hier:
 Dieses Dokument ist als Referenz für eigene Arbeiten gedacht. Beachte die Kommentare und Fussnoten in den `.tex`-Dateien, die zusätzliche Erklärungen zum arc42-Framework und zur methodischen Vorgehensweise im Modul bieten.
 
 **Kontakt:** Rolf Jufer (rolf.jufer@hftm.ch)
+
+---
+
+## Lizenz
+
+Dieses Projekt ist unter der **Apache License 2.0** lizenziert. Weitere Details finden Sie in der Datei [LICENSE](LICENSE).
