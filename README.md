@@ -83,4 +83,12 @@ Dieses Dokument ist als Referenz für eigene Arbeiten gedacht. Beachte die Komme
 
 ## Lizenz
 
-Dieses Projekt ist unter der **Apache License 2.0** lizenziert. Weitere Details finden Sie in der Datei [LICENSE](LICENSE).
+Dieses Projekt ist unter der **Apache License 2.0** lizenziert. Details finden Sie in der Datei [LICENSE](LICENSE).
+
+Das Projekt wurde ursprünglich von **Rolf Jufer** (rolf.jufer@hftm.ch) erstellt.
+
+Bei einer Weitergabe dieses Projekts oder darauf basierender abgeleiteter Arbeiten
+sind bestehende Copyright-, Lizenz- und NOTICE-Hinweise beizubehalten.
+
+Bevorzugte Namensnennung:
+„Basierend auf der Arbeit von Rolf Jufer (rolf.jufer@hftm.ch)“
