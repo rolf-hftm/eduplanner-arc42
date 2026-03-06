@@ -1,0 +1,53 @@
+\section{Anhang~A: Event~Storming -- Ergebnisse}
+
+Dieser Anhang dokumentiert die Ergebnisse des Event-Storming-Workshops, der zu Beginn der Architekturarbeit durchgeführt wurde. Event~Storming\footnote{%
+  \textit{Event Storming} wurde von Alberto Brandolini entwickelt und erstmals in seinem Buch
+  \textit{Introducing EventStorming} (Leanpub, 2021, \url{https://leanpub.com/introducing_eventstorming})
+  beschrieben. Weitere Informationen unter \url{https://www.eventstorming.com}.}
+ist eine kollaborative Workshop-Technik aus dem Domain-Driven Design (DDD), bei der Fachexperten und Entwickler gemeinsam die relevanten Ereignisse (Events) eines Geschäftsbereichs auf farbcodierten Haftnotizen erarbeiten. Ziel ist es, ein gemeinsames Verständnis der Domäne zu schaffen, Bounded~Contexts zu identifizieren und die Grundlage für eine ereignisorientierte Architektur zu legen -- ohne technische Implementierungsdetails vorwegzunehmen.
+
+\subsection{Methodik}
+
+Das Event~Storming wurde nach der Methode von Alberto Brandolini durchgeführt. Der Workshop gliedert sich in sechs aufeinander aufbauende Phasen, die vom bewusst unstrukturierten Sammeln von Ereignissen bis hin zur Identifikation fachlicher Grenzen (Bounded~Contexts) führen.
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{Chaotische Exploration} ($\sim$30~min): Alle Teilnehmer schreiben Domain~Events auf orangefarbene Haftnotizen.
+  \item \textbf{Timeline}: Events werden in zeitlicher Reihenfolge angeordnet.
+  \item \textbf{Hotspots}: Rote Karten für unklare Stellen.
+  \item \textbf{Kommandos}: Blaue Karten für Nutzeraktionen vor dem Event.
+  \item \textbf{Akteure und Systeme}: Gelbe Karten für Auslöser.
+  \item \textbf{Bounded Contexts}: Natürliche Gruppen werden eingerahmt.
+\end{enumerate}
+
+\subsection{Vollständige Domain-Event-Liste}
+
+Die nachfolgende Tabelle listet alle im Workshop erarbeiteten Domain~Events von EduPlanner. Jedes Event ist einem auslösenden Akteur (Staff, Admin, Participant oder System) sowie einem Bounded~Context zugeordnet. Die Bounded~Contexts entsprechen direkt den Microservices der Zielarchitektur (vgl.\ Kap.~5).
+
+\begin{tabularx}{\textwidth}{L{5cm} L{3.5cm} X}
+  \rowcolor{tableheader}
+  \color{white}\textbf{Domain Event} & \color{white}\textbf{Auslöser (Akteur)} & \color{white}\textbf{Bounded Context} \\
+  CourseCreated & Staff & catalog \\
+  \rowcolor{tablegrey}
+  CourseTitleUpdated & Staff & catalog \\
+  TrainerAssignedToCourse & Staff & catalog \\
+  \rowcolor{tablegrey}
+  CoursePublished & Admin & catalog \\
+  CourseArchived & Admin & catalog \\
+  \rowcolor{tablegrey}
+  CourseExecutionScheduled & Staff & scheduling \\
+  TrainerAssignedToExecution & Staff & scheduling \\
+  \rowcolor{tablegrey}
+  CourseExecutionPublished & Admin & scheduling \\
+  CourseExecutionCancelled & Admin / System & scheduling \\
+  \rowcolor{tablegrey}
+  ParticipantRegistered & Participant & registration \\
+  ParticipantAddedToWaitlist & System & registration \\
+  \rowcolor{tablegrey}
+  RegistrationCancelled & Participant / Staff & registration \\
+  WaitlistParticipantPromoted & System & registration \\
+  \rowcolor{tablegrey}
+  EmailNotificationSent & System & notification \\
+  UserCreated & Admin / IdP & identity \\
+  \rowcolor{tablegrey}
+  UserRoleAssigned & Admin & identity \\
+\end{tabularx}

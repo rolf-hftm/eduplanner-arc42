@@ -1,0 +1,176 @@
+% ============================================================
+% EduPlanner – arc42 Architekturdokumentation v1.0
+% ============================================================
+
+% --- Encoding & Fonts ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+
+% babel-german not available; basic latin encoding used
+
+% --- Layout ---
+\usepackage[a4paper, top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm, headheight=15pt]{geometry}
+\usepackage{parskip}
+\setlength{\parindent}{0pt}
+
+% --- Colours ---
+\usepackage{xcolor}
+\definecolor{darkblue}{HTML}{1F4E79}
+\definecolor{midblue}{HTML}{2E75B6}
+\definecolor{lightblue}{HTML}{D6E4F0}
+\definecolor{tablegrey}{HTML}{F2F2F2}
+\definecolor{tableheader}{HTML}{1F4E79}
+\definecolor{noteyellow}{HTML}{FFF8DC}
+\definecolor{noteborder}{HTML}{F0A500}
+\definecolor{notegreen}{HTML}{E8F4E8}
+\definecolor{notegreenborder}{HTML}{375623}
+\definecolor{notered}{HTML}{FDECEA}
+\definecolor{noteredborder}{HTML}{C00000}
+\definecolor{codebg}{HTML}{F5F5F5}
+\definecolor{codefg}{HTML}{1A1A2E}
+\definecolor{grey}{HTML}{595959}
+
+% --- Tables ---
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{colortbl}
+\usepackage{multirow}
+\renewcommand{\arraystretch}{1.35}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+
+% --- Graphics & Boxes ---
+\usepackage{graphicx}
+\graphicspath{{assets/}}
+\usepackage{tcolorbox}
+\tcbuselibrary{skins, breakable}
+
+% Hinweis-Box (gelb)
+\newtcolorbox{hinweis}[1][Hinweis]{
+  breakable, enhanced,
+  colback=noteyellow, colframe=noteborder,
+  fonttitle=\sffamily\bfseries\small, title=#1,
+  left=4pt, right=4pt, top=4pt, bottom=4pt,
+  fontupper=\small\itshape
+}
+
+% Review-Box (grün)
+\newtcolorbox{reviewbox}[1][Review v2.1]{
+  breakable, enhanced,
+  colback=notegreen, colframe=notegreenborder,
+  fonttitle=\sffamily\bfseries\small\color{white},
+  title=#1,
+  coltitle=white,
+  attach boxed title to top left={yshift=-2mm, xshift=4mm},
+  boxed title style={colback=notegreenborder},
+  left=4pt, right=4pt, top=6pt, bottom=4pt,
+  fontupper=\small\itshape
+}
+
+% Korrektur-Box (rot/orange)
+\newtcolorbox{korrektur}[1][Korrektur v1.0]{
+  breakable, enhanced,
+  colback=notered, colframe=noteredborder,
+  fonttitle=\sffamily\bfseries\small,
+  title=#1,
+  left=4pt, right=4pt, top=4pt, bottom=4pt,
+  fontupper=\small\itshape
+}
+
+% Lehrhinweis-Box (blau)
+\newtcolorbox{lehrhinweis}[1][Lehrhinweis]{
+  breakable, enhanced,
+  colback=lightblue, colframe=midblue,
+  fonttitle=\sffamily\bfseries\small,
+  title=#1,
+  left=4pt, right=4pt, top=4pt, bottom=4pt,
+  fontupper=\small\itshape
+}
+
+% --- Code ---
+\usepackage{listings}
+\lstset{
+  backgroundcolor=\color{codebg},
+  basicstyle=\ttfamily\footnotesize\color{codefg},
+  breaklines=true,
+  frame=leftline,
+  framerule=2pt,
+  rulecolor=\color{midblue},
+  xleftmargin=8pt,
+  xrightmargin=4pt,
+  aboveskip=6pt,
+  belowskip=6pt,
+  extendedchars=true,
+  literate=%
+    {ä}{{\"{a}}}1 {ö}{{\"{o}}}1 {ü}{{\"{u}}}1%
+    {Ä}{{\"{A}}}1 {Ö}{{\"{O}}}1 {Ü}{{\"{U}}}1%
+    {ß}{{\ss{}}}1,
+}
+
+% --- Headings ---
+\usepackage{titlesec}
+\usepackage{needspace}
+\setcounter{secnumdepth}{3}  % Nummerierung bis subsubsection
+
+\titleformat{\section}{\sffamily\LARGE\bfseries\color{darkblue}}{\thesection}{1em}{}[\vspace{1pt}\color{midblue}\titlerule]
+\titleformat{\subsection}{\sffamily\large\bfseries\color{midblue}}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}{\sffamily\normalsize\bfseries\color{grey}}{\thesubsubsection}{1em}{}
+\titlespacing{\section}{0pt}{18pt}{8pt}
+\titlespacing{\subsection}{0pt}{14pt}{4pt}
+\titlespacing{\subsubsection}{0pt}{10pt}{2pt}
+\preto\subsubsection{\needspace{4\baselineskip}}
+
+% --- TOC ---
+\usepackage{tocloft}
+\renewcommand{\cftsecfont}{\sffamily\bfseries\color{darkblue}}
+\renewcommand{\cftsubsecfont}{\sffamily\color{midblue}}
+\renewcommand{\cftsecpagefont}{\sffamily\bfseries}
+\setlength{\cftbeforesecskip}{4pt}
+
+% --- Header/Footer ---
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\sffamily\color{grey}EduPlanner -- arc42 Architekturdokumentation v1.0 (arc42~v9)}
+\fancyhead[R]{\small\sffamily\color{grey}Vertraulich -- Intern (Lehrfassung HFTM)}
+\fancyfoot[L]{\small\sffamily\color{grey}SkillBridge AG (fiktiv) \textperiodcentered{} März 2026}
+\fancyfoot[R]{\small\sffamily\color{grey}Seite \thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.4pt}
+\renewcommand{\headrule}{\color{midblue}\hrule width\headwidth height\headrulewidth}
+\renewcommand{\footrule}{\color{midblue}\hrule width\headwidth height\footrulewidth}
+
+% --- Misc ---
+\usepackage{enumitem}
+\usepackage{hyperref}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=midblue,
+  urlcolor=midblue,
+  pdftitle={EduPlanner arc42 v1.0 (arc42 Version 9)},
+  pdfauthor={SkillBridge AG (fiktiv)},
+}
+
+\usepackage{float}
+
+\interfootnotelinepenalty=10000   % Fussnoten nie umbrechen
+% microtype disabled - font expansion requires scalable fonts
+\usepackage{pifont}
+\usepackage{amssymb}
+
+\usepackage{plantuml}
+
+\usepackage{xltabular}   % = longtable + tabularx
+
+% Checkmark / cross helpers
+\newcommand{\yes}{\textcolor{notegreenborder}{\ding{51}}}
+\newcommand{\no}{\textcolor{noteredborder}{\ding{55}}}
+
+
+
+% Thin rule for visual separation
+\newcommand{\sectionrule}{\vspace{4pt}\color{midblue}\hrule\vspace{6pt}}
+
+\usepackage[ngerman]{babel}   % für neue deutsche Rechtschreibung

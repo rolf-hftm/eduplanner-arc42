@@ -1,0 +1,40 @@
+@startuml NotificationClassDiagram
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam classBackgroundColor #E8F4F8
+skinparam classBorderColor #333333
+skinparam classArrowColor #333333
+skinparam linetype ortho
+skinparam fontSize 11
+skinparam fontName Helvetica
+
+package "notification Service" {
+  class EventConsumer
+  class EmailTemplateService
+  class EmailTemplate
+  class Email
+  class EmailClient <<interface>>
+  class SESClient
+  class SendGridClient
+  interface EventRepository <<Port>>
+  abstract class DomainEvent
+  class ParticipantRegistered
+  class ParticipantAddedToWaitlist
+  class RegistrationCancelled
+  class CoursePublished
+
+  EventConsumer --> EventRepository
+  EventConsumer --> EmailTemplateService
+  EventConsumer --> EmailClient
+  EmailTemplateService --> EmailTemplate
+  EmailTemplate --> Email
+  SESClient ..|> EmailClient
+  SendGridClient ..|> EmailClient
+  EventConsumer ..> DomainEvent : consumes
+  ParticipantRegistered --|> DomainEvent
+  ParticipantAddedToWaitlist --|> DomainEvent
+  RegistrationCancelled --|> DomainEvent
+  CoursePublished --|> DomainEvent
+}
+
+@enduml

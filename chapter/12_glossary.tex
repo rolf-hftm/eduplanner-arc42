@@ -1,0 +1,69 @@
+\section{Glossar}
+
+Das Glossar definiert die Ubiquitous Language von EduPlanner.
+
+\subsection{Fachliche Begriffe}
+
+\begin{longtable}{L{3cm} L{2cm} p{\dimexpr\linewidth-5cm-6\tabcolsep\relax}}
+  \rowcolor{tableheader}
+  \color{white}\textbf{Begriff} & \color{white}\textbf{Kontext} & \color{white}\textbf{Definition} \\
+  \endfirsthead
+  \rowcolor{tableheader}
+  \color{white}\textbf{Begriff} & \color{white}\textbf{Kontext} & \color{white}\textbf{Definition} \\
+  \endhead
+ Course & [catalog] & Weiterbildungsangebot mit Titel, Beschreibung und Lernzielen. Beschreibt \emph{was} gelehrt wird. Bsp.: ``Python für Einsteiger''. \\
+  \rowcolor{tablegrey}
+  CourseStatus & [catalog] & Zustand eines Kurses: DRAFT $\to$ PUBLISHED $\to$ ARCHIVED. Nur diese Übergänge erlaubt (State Machine). \\
+  TrainerProfile & [catalog] & Stammdaten eines Trainers inkl.\ Fachgebiete. \\
+  \rowcolor{tablegrey}
+  CourseExecution & [scheduling] & Konkrete, zeitlich geplante Instanz eines Kurses. Bsp.: ``Python Apr~2025, Bern, max.\ 12~TN''. \\
+  ExecutionStatus & [scheduling] & PLANNED $\to$ PUBLISHED $\to$ CANCELLED. Nur PUBLISHED offen für Einschreibungen. \\
+  \rowcolor{tablegrey}
+  Capacity & [scheduling, reg.] & Maximale Teilnehmeranzahl. Kapazität = 0 $\to$ Warteliste. \\
+  Registration & [registration] & Verbindliche Anmeldung eines Teilnehmers zu einer Execution. Bsp.: Max Muster meldet sich an $\to$ \texttt{status=REGISTERED}. \\
+  \rowcolor{tablegrey}
+  WaitlistEntry & [registration] & Wartelisteneintrag mit Position (1 = erster) und Zeitstempel. \\
+  Participant & [identity] & Natürliche Person, die sich einschreiben kann. Systemrolle: PARTICIPANT. \\
+  \rowcolor{tablegrey}
+  Trainer & [identity] & Kursleiter. Systemrolle: TRAINER. \\
+  Staff & [identity] & Mitarbeitende des Kursanbieters. Systemrolle: STAFF. \\
+  \rowcolor{tablegrey}
+  Admin & [identity] & Nutzer mit erweiterten Systemrechten. Systemrolle: ADMIN. \\
+  Domain Event & -- & Unveränderliche Zustandsänderung als Fakt (Vergangenheitsform). Bsp.: \texttt{ParticipantRegistered} (nicht \texttt{RegisterParticipant}). \\
+  \rowcolor{tablegrey}
+  Bounded Context & -- & Klar abgegrenzter Bereich mit eigener Fachsprache. Bsp.: ``Trainer'' in [catalog] hat andere Bedeutung als in [scheduling]. \\
+  Aggregate & -- & Gruppe von Domain-Objekten als konsistente Einheit. Aggregate Root ist einziger Einstiegspunkt. Bsp.: Registration-Aggregate verhindert Überbuchung. \\
+  \rowcolor{tablegrey}
+  Ubiquitous Language & -- & Gemeinsame fachliche Sprache innerhalb eines BC. Code-Bezeichner verwenden exakt dieselben Begriffe wie die Fachsprache. \\
+\end{longtable}
+
+\subsection{Domain Events -- Vollständige Übersicht}
+
+\begin{tabularx}{\textwidth}{L{5cm} L{2.5cm} X}
+  \rowcolor{tableheader}
+  \color{white}\textbf{Domain Event} & \color{white}\textbf{Kontext} & \color{white}\textbf{Auslöser} \\
+  CourseCreated & catalog & Staff legt Kurs an \\
+  \rowcolor{tablegrey}
+  CourseTitleUpdated & catalog & Staff aktualisiert Kurstitel \\
+  TrainerAssignedToCourse & catalog & Staff ordnet Trainer zu \\
+  \rowcolor{tablegrey}
+  CoursePublished & catalog & Admin veröffentlicht \\
+  CourseArchived & catalog & Admin archiviert \\
+  \rowcolor{tablegrey}
+  CourseExecutionScheduled & scheduling & Staff plant Durchführung \\
+  TrainerAssignedToExecution & scheduling & Staff weist Trainer zu \\
+  \rowcolor{tablegrey}
+  CourseExecutionPublished & scheduling & Admin gibt frei \\
+  CourseExecutionCancelled & scheduling & Admin / System storniert \\
+  \rowcolor{tablegrey}
+  ParticipantRegistered & registration & Teilnehmer schreibt sich ein \\
+  ParticipantAddedToWaitlist & registration & Kurs voll \\
+  \rowcolor{tablegrey}
+  RegistrationCancelled & registration & Teilnehmer / Staff storniert \\
+  WaitlistParticipantPromoted & registration & Nachrücker von Warteliste \\
+  \rowcolor{tablegrey}
+  EmailNotificationSent & notification & System hat E-Mail versendet \\
+  UserCreated & identity & Admin / IdP legt Benutzer an \\
+  \rowcolor{tablegrey}
+  UserRoleAssigned & identity & Admin weist Rolle zu \\
+\end{tabularx}

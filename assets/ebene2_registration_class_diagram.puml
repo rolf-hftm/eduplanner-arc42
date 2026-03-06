@@ -1,0 +1,43 @@
+@startuml RegistrationClassDiagram
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam classBackgroundColor #E8F4F8
+skinparam classBorderColor #333333
+skinparam classArrowColor #333333
+skinparam linetype ortho
+skinparam fontSize 11
+skinparam fontName Helvetica
+
+package "registration Service" {
+  class RegistrationController
+  class RegistrationService
+  class Registration <<AggregateRoot>>
+  class RegistrationStatus <<ValueObject>>
+  class WaitlistEntry <<ValueObject>>
+  class CapacityChecker
+  class CapacityResult <<ValueObject>>
+  interface RegistrationRepository <<Port>>
+  class RegistrationRepositoryJPA
+  class OutboxPublisher
+  class ParticipantRegistered <<Event>>
+  class ParticipantAddedToWaitlist <<Event>>
+  class RegistrationCancelled <<Event>>
+  class WaitlistParticipantPromoted <<Event>>
+
+  RegistrationController --> RegistrationService
+  RegistrationService --> RegistrationRepository
+  RegistrationService --> CapacityChecker
+  RegistrationService --> OutboxPublisher
+  RegistrationService --> Registration
+  Registration --> RegistrationStatus
+  Registration --> WaitlistEntry
+  CapacityChecker --> RegistrationRepository
+  CapacityChecker --> CapacityResult
+  RegistrationRepositoryJPA ..|> RegistrationRepository
+  OutboxPublisher --> ParticipantRegistered
+  OutboxPublisher --> ParticipantAddedToWaitlist
+  OutboxPublisher --> RegistrationCancelled
+  OutboxPublisher --> WaitlistParticipantPromoted
+}
+
+@enduml

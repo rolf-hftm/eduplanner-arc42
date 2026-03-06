@@ -1,0 +1,190 @@
+% ============================================================
+% ANHANG D – API-Referenz (OpenAPI 3.1.0 – Contract-First)
+% ============================================================
+
+\section{Anhang~D: API-Referenz}
+\label{sec:anhang-openapi}
+
+\begin{hinweis}[Contract-First -- Einzige Quelle der Wahrheit]
+  Die Datei \texttt{openapi/}\allowbreak \texttt{eduplanner-}\allowbreak \texttt{api.yaml} ist die verbindliche
+  API-Spezifikation (OpenAPI~3.1.0). Server-Stubs (Spring-Boot-Interfaces)
+  werden daraus generiert -- nicht umgekehrt. Änderungen an der API
+  \emph{beginnen immer} mit einer Änderung an der YAML-Datei.
+  Begründung: ADR-011. Workflow: Kap.~8.4.
+\end{hinweis}
+
+% ── Contract-First Build-Pipeline ───────────────────────────
+\subsection*{Contract-First Build-Pipeline}
+
+\begin{figure}[H]
+  \centering
+  \begin{tabularx}{\textwidth}{C{0.6cm} L{3.8cm} X}
+  \rowcolor{tableheader}
+  \color{white}\textbf{\#} &
+  \color{white}\textbf{Schritt} &
+  \color{white}\textbf{Tool / Ergebnis} \\
+  1 & Spec schreiben / ändern &
+  \texttt{openapi/}\allowbreak \texttt{eduplanner-}\allowbreak \texttt{api.yaml} in Git committen \\
+  \rowcolor{tablegrey}
+  2 & Linting (CI) &
+  \texttt{vacuum lint eduplanner-}\allowbreak \texttt{api.yaml} -- blockiert Build
+  bei Verstössen gegen API-Design-Regeln \\
+  3 & Server-Stubs generieren (Build) &
+  \texttt{openapi-}\allowbreak \texttt{generator-}\allowbreak \texttt{maven-}\allowbreak \texttt{plugin} erzeugt
+  Spring-Boot-Interfaces (\texttt{CoursesApi},
+  \texttt{RegistrationsApi} etc.) mit
+  \texttt{interfaceOnly=true} \\
+  \rowcolor{tablegrey}
+  4 & Implementieren &
+  Dev-Team implementiert generierte Interfaces;
+  Compiler erzwingt Konformität \\
+  5 & Swagger~UI bereitstellen &
+  \texttt{springdoc-}\allowbreak \texttt{openapi-}\allowbreak \texttt{starter-}\allowbreak \texttt{webmvc-}\allowbreak \texttt{ui} stellt
+  \texttt{/swagger-ui/index.html} automatisch bereit \\
+  \rowcolor{tablegrey}
+  6 & Contract Tests (ab Sprint~8) &
+  Pact-Tests validieren Consumer/Provider-Konformität
+  (Tilgung TS2) \\
+  \end{tabularx}
+\end{figure}
+
+\begin{hinweis}[Swagger~UI -- Zugriff je Umgebung]
+  \begin{tabularx}{\textwidth}{L{3cm} X}
+  \rowcolor{tableheader}
+  \color{white}\textbf{Umgebung} & \color{white}\textbf{URL} \\
+  Lokal (Docker) &
+  \texttt{http://localhost:\{port\}/swagger-ui/index.html} \\
+  \rowcolor{tablegrey}
+  Staging &
+  \texttt{https://staging-api.eduplanner.skillbridge.ch/}\allowbreak\texttt{\{service\}/swagger-ui/index.html} \\
+  Produktion &
+  Nur aus internem Netz (API-Gateway-Policy); nicht öffentlich erreichbar. \\
+  \end{tabularx}
+\end{hinweis}
+
+% ── Endpunktübersicht ────────────────────────────────────────
+\subsection*{Endpunktübersicht}
+
+% ── Catalog ──────────────────────────────────────────────────
+\begin{tabularx}{\textwidth}{L{1.3cm} L{5.8cm} L{2.3cm} X}
+  \rowcolor{tableheader}
+  \color{white}\textbf{Methode} &
+  \color{white}\textbf{Pfad} &
+  \color{white}\textbf{Service} &
+  \color{white}\textbf{Mindestrolle} \\
+  \multicolumn{4}{l}{\cellcolor{tablegrey}%
+  \textbf{Catalog-Service} \small(\texttt{/swagger-ui/index.html}, Port~8081)} \\
+  GET    & \texttt{/courses}                      & catalog & Authentifiziert \\
+  \rowcolor{tablegrey}
+  POST   & \texttt{/courses}                      & catalog & STAFF \\
+  GET    & \texttt{/courses/\{courseId\}}         & catalog & Authentifiziert \\
+  \rowcolor{tablegrey}
+  PUT    & \texttt{/courses/\{courseId\}}         & catalog & STAFF \\
+  DELETE & \texttt{/courses/\{courseId\}}         & catalog & ADMIN \\
+  \rowcolor{tablegrey}
+  PUT    & \texttt{/courses/\{courseId\}/publish} & catalog & ADMIN \\
+  PUT    & \texttt{/courses/\{courseId\}/archive} & catalog & ADMIN \\
+  \rowcolor{tablegrey}
+  GET    & \texttt{/trainers}                     & catalog & Authentifiziert \\
+  POST   & \texttt{/trainers}                     & catalog & STAFF \\
+  \rowcolor{tablegrey}
+  GET    & \texttt{/trainers/\{trainerId\}}       & catalog & Authentifiziert \\
+  PUT    & \texttt{/trainers/\{trainerId\}}       & catalog & STAFF \\
+\end{tabularx}
+
+\vspace{0.8em}
+
+% ── Scheduling ───────────────────────────────────────────────
+\begin{tabularx}{\textwidth}{L{1.3cm} L{5.8cm} L{2.3cm} X}
+  \rowcolor{tableheader}
+  \color{white}\textbf{Methode} &
+  \color{white}\textbf{Pfad} &
+  \color{white}\textbf{Service} &
+  \color{white}\textbf{Mindestrolle} \\
+  \multicolumn{4}{l}{\cellcolor{tablegrey}%
+  \textbf{Scheduling-Service} \small(\texttt{/swagger-ui/index.html}, Port~8082)} \\
+  GET    & \texttt{/executions}                          & scheduling & Authentifiziert \\
+  \rowcolor{tablegrey}
+  POST   & \texttt{/executions}                          & scheduling & STAFF \\
+  GET    & \texttt{/executions/\{executionId\}}          & scheduling & Authentifiziert \\
+  \rowcolor{tablegrey}
+  PUT    & \texttt{/executions/\{executionId\}}          & scheduling & STAFF \\
+  PUT    & \texttt{/executions/\{executionId\} /publish}  & scheduling & ADMIN \\
+  \rowcolor{tablegrey}
+  PUT    & \texttt{/executions/\{executionId\} /cancel}   & scheduling & ADMIN \\
+  GET    & \texttt{/executions/\{executionId\} /participants} & scheduling & STAFF \\
+\end{tabularx}
+
+\vspace{0.8em}
+
+% ── Registration ─────────────────────────────────────────────
+\begin{tabularx}{\textwidth}{L{1.3cm} L{5.8cm} L{2.3cm} X}
+  \rowcolor{tableheader}
+  \color{white}\textbf{Methode} &
+  \color{white}\textbf{Pfad} &
+  \color{white}\textbf{Service} &
+  \color{white}\textbf{Mindestrolle} \\
+  \multicolumn{4}{l}{\cellcolor{tablegrey}%
+  \textbf{Registration-Service} \small(\texttt{/swagger-ui/index.html}, Port~8083 -- kritischster Service)} \\
+  GET    & \texttt{/registrations}                        & registration & Authentifiziert \\
+  \rowcolor{tablegrey}
+  POST   & \texttt{/registrations}                        & registration & PARTICIPANT \\
+  GET    & \texttt{/registrations/\{id\}}                 & registration & Authentifiziert \\
+  \rowcolor{tablegrey}
+  DELETE & \texttt{/registrations/\{id\}}                 & registration & PARTICIPANT \\
+  GET    & \texttt{/registrations/\{id\} /waitlist-position} & registration & Authentifiziert \\
+\end{tabularx}
+
+\vspace{0.8em}
+
+% ── Identity ─────────────────────────────────────────────────
+\begin{tabularx}{\textwidth}{L{1.3cm} L{5.8cm} L{2.3cm} X}
+  \rowcolor{tableheader}
+  \color{white}\textbf{Methode} &
+  \color{white}\textbf{Pfad} &
+  \color{white}\textbf{Service} &
+  \color{white}\textbf{Mindestrolle} \\
+  \multicolumn{4}{l}{\cellcolor{tablegrey}%
+  \textbf{Identity-Service} \small(\texttt{/swagger-ui/index.html}, Port~8084)} \\
+  GET    & \texttt{/users}                    & identity & ADMIN \\
+  \rowcolor{tablegrey}
+  GET    & \texttt{/users/\{userId\}}         & identity & ADMIN\,/\,eigenes Profil \\
+  GET    & \texttt{/users/\{userId\}/roles}   & identity & ADMIN \\
+  \rowcolor{tablegrey}
+  PUT    & \texttt{/users/\{userId\}/roles}   & identity & ADMIN \\
+  DELETE & \texttt{/users/\{userId\}/delete-pii} & identity & ADMIN \\
+  \rowcolor{tablegrey}
+  GET    & \texttt{/me}                       & identity & Authentifiziert \\
+\end{tabularx}
+
+% ── Designentscheide aus der Spec ───────────────────────────
+\subsection*{Designentscheide}
+
+\begin{tabularx}{\textwidth}{L{3.5cm} X}
+  \rowcolor{tableheader}
+  \color{white}\textbf{Aspekt} & \color{white}\textbf{Umsetzung} \\
+  Authentifizierung & RS256-signierter JWT Bearer Token; 15~Min.\ Laufzeit;
+  Validierung am API Gateway (Kap.~8.1). \\
+  \rowcolor{tablegrey}
+  Fehlerantworten & RFC~7807 \texttt{application/problem+json} mit
+  \texttt{type}, \texttt{title}, \texttt{status}, \texttt{detail},
+  \texttt{instance}, \texttt{errors} (Kap.~8.4). \\
+  Pagination & Cursor-basiert (\texttt{?cursor=\ldots\&limit=20},
+  max.\ 100); kein Offset-Paging. \\
+  \rowcolor{tablegrey}
+  Idempotency & \texttt{Idempotency-Key}-Header (UUID) bei allen
+  POST-Endpunkten (Kap.~5.4). \\
+  Kapazitätsprüfung & \texttt{POST /registrations}: 201~Created bei
+  freiem Platz; 202~Accepted auf Warteliste (Kap.~6.1, 6.2). \\
+  \rowcolor{tablegrey}
+  DSGVO-Löschung & \texttt{DELETE /users/\{id\}/delete-pii}: 202~Accepted,
+  Abschluss innerhalb 30~Tagen (Q8, Q12). \\
+  Versionierung & \texttt{/api/v1/...}; Breaking Changes $\to$
+  \texttt{/api/v2/...} (ADR-011). \\
+  \rowcolor{tablegrey}
+  PII-Schutz & \texttt{User}-Schema enthält keine E-Mail-Adresse;
+  nur \texttt{userId} (UUID) in Events (Kap.~8.2, 4.3). \\
+  Optimistic Locking & \texttt{version}-Feld (int64) in
+  \texttt{Course}, \texttt{CourseExecution}, \texttt{Registration};
+  Konflikt $\to$ 409~Conflict (Kap.~8.3). \\
+\end{tabularx}

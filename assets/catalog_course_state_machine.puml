@@ -1,0 +1,23 @@
+@startuml CourseStatus
+!define DIRECTION right
+
+state DRAFT <<draft>>
+state PUBLISHED <<published>>
+state ARCHIVED <<archived>>
+
+DRAFT : Kurs in Bearbeitung,\nnicht sichtbar\nfür Teilnehmer
+PUBLISHED : Kurs sichtbar,\nEinschreibung\nmöglich
+ARCHIVED : Kurs abgeschlossen,\nkeine Einschreibung\nmehr möglich
+
+[*] --> DRAFT
+DRAFT --> PUBLISHED : publish()
+PUBLISHED --> ARCHIVED : archive()
+DRAFT --> DRAFT : updateMetadata()
+PUBLISHED --> DRAFT : edit()
+ARCHIVED --> [*]
+
+note bottom of ARCHIVED
+  Rückwärtsübergänge sind nicht erlaubt (ADR-006)
+end note
+
+@enduml

@@ -1,0 +1,37 @@
+@startuml IdentityClassDiagram
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam classBackgroundColor #E8F4F8
+skinparam classBorderColor #333333
+skinparam classArrowColor #333333
+skinparam linetype ortho
+skinparam fontSize 11
+skinparam fontName Helvetica
+
+package "identity Service" {
+  class IdentityController
+  class AuthenticationService
+  class AuthorizationService
+  class OIDCAdapter
+  class RoleService
+  interface IdentityProvider <<Port>>
+  class KeycloakClient
+  class User <<ValueObject>>
+  class Token <<ValueObject>>
+  class Role <<ValueObject>>
+
+  IdentityController --> AuthenticationService
+  IdentityController --> AuthorizationService
+  AuthenticationService --> OIDCAdapter
+  AuthenticationService --> User
+  AuthenticationService --> Token
+  OIDCAdapter ..|> IdentityProvider
+  OIDCAdapter --> KeycloakClient
+  AuthorizationService --> RoleService
+  AuthorizationService --> User
+  RoleService --> Role
+  User --> Token
+  User --> Role
+}
+
+@enduml

@@ -1,0 +1,288 @@
+\section{Querschnittliche Konzepte}
+
+Dieser Abschnitt beschreibt Konzepte und Entscheidungen, die nicht einem einzelnen
+Service zugeordnet sind, sondern das gesamte System betreffen. Sie bilden die
+gemeinsame technische Basis für Sicherheit, Betrieb, Datenhaltung und Qualitätssicherung.
+
+\subsection{Sicherheitskonzept}
+
+Das Sicherheitskonzept basiert auf dem Prinzip der minimalen Rechte: Authentifizierung
+und Autorisierung sind konsequent voneinander getrennt, zentral über den
+\texttt{identity}-Service koordiniert und in jedem Service durchgesetzt.
+
+\subsubsection{Authentifizierung}
+
+Die Authentifizierung ist vollständig an einen externen OIDC-Provider delegiert.
+Das System selbst speichert keine Passwörter -- es vertraut ausschliesslich
+signierten JWT-Tokens, deren Gültigkeit am API Gateway geprüft wird.
+
+\begin{itemize}[leftmargin=1.5em]
+  \item OIDC / OAuth~2.0: Authentifizierung vollständig extern (z.\,B.\ Keycloak, Azure~AD).
+  \item JWT-Access-Token (RS256-signiert, 15~Min.), Refresh-Token (8~h).
+  \item API Gateway validiert JWT-Signatur via JWKS-Endpoint; ungültig $\to$ 401.
+  \item Silent Refresh: Frontend erneuert Token automatisch.
+\end{itemize}
+
+\subsubsection{Autorisierung (RBAC)}
+
+Die Zugriffskontrolle erfolgt rollenbasiert (RBAC). Rollen werden als Claims im
+JWT übertragen und von jedem Service eigenständig ausgewertet -- ein zentraler
+Autorisierungs-Roundtrip entfällt damit pro Request. Der folgende
+Payload-Ausschnitt zeigt die Struktur eines dekodiertes JWT:
+
+\begin{lstlisting}
+{
+  "sub": "user-uuid-123",
+  "roles": ["PARTICIPANT"],
+  "locale": "de",
+  "tenant_id": "skillbridge",
+  "exp": 1700000900
+}
+\end{lstlisting}
+
+E-Mail ist im OIDC-Token vorhanden, wird aber nie geloggt (PII-Schutz, Kap.~8.6).
+
+Die folgende Tabelle zeigt, welche Aktionen den einzelnen Rollen erlaubt sind:
+
+\begin{tabularx}{\textwidth}{X C{1.8cm} C{1.8cm} C{1.8cm} C{2.2cm}}
+  \rowcolor{tableheader}
+  \color{white}\textbf{Aktion} & \color{white}\textbf{Admin} & \color{white}\textbf{Staff} & \color{white}\textbf{Trainer} & \color{white}\textbf{Participant} \\
+  Kurs erstellen & \yes & \yes & \no & \no \\
+  \rowcolor{tablegrey}
+  Kurs veröffentlichen & \yes & \no & \no & \no \\
+  Kurs archivieren & \yes & \no & \no & \no \\
+  \rowcolor{tablegrey}
+  Durchführung planen & \yes & \yes & \no & \no \\
+  Sich einschreiben & \yes & \yes & \yes & \yes \\
+  \rowcolor{tablegrey}
+  Eigene Stornierung & \yes & \yes & \yes & \yes \\
+  Alle Einschreibungen sehen & \yes & \yes & \no & \no \\
+  \rowcolor{tablegrey}
+  Nutzer verwalten & \yes & \no & \no & \no \\
+\end{tabularx}
+
+\begin{hinweis}[RBAC -- Einschreiberecht für TRAINER]
+  Die Berechtigung \emph{„Sich einschreiben"} für die Rolle TRAINER ist bewusst gewählt: Trainer können
+  Weiterbildungsangebote ihrer Kollegen als Teilnehmer besuchen (Beispiel: ein Java-Trainer schreibt sich
+  in einen Python-Kurs ein). Diese Rollenakkumulation ist im \texttt{identity}-Service durch die
+  Multi-Rollen-Unterstützung abgebildet (\texttt{"roles": ["TRAINER", "PARTICIPANT"]} im JWT möglich).
+  Falls ein Kursanbieter dies nicht wünscht, kann die Berechtigung per Konfiguration deaktiviert werden.
+\end{hinweis}
+
+Die folgende Tabelle beschreibt die eingesetzten Resilience-Muster, die das System
+gegenüber transienten Fehlern und Kaskadenausfällen absichern:
+
+\begin{tabularx}{\textwidth}{L{3.5cm} X}
+  \rowcolor{tableheader}
+  \color{white}\textbf{Muster} & \color{white}\textbf{Beschreibung} \\
+  Circuit Breaker & Resilience4j: 5~Fehler in 10\,s $\to$ Open; Half-Open nach 30\,s. \\
+  \rowcolor{tablegrey}
+  Retry + Exp.\ Backoff & Bis zu 3×; Backoff: 100\,ms / 500\,ms / 2\,s. \\
+  Dead-Letter-Queue & Nach 3~Fehlversuchen; Alerting bei DLQ-Tiefe $>$ 0. \\
+  \rowcolor{tablegrey}
+  Graceful Degradation & Ausfall von \texttt{notification} blockiert nie die Einschreibung. \\
+  Idempotente Handler & EventId-Prüfung in \texttt{notification\_log}; Duplikate werden ignoriert. \\
+  \rowcolor{tablegrey}
+  Timeout & Connect-Timeout 2\,s; Read-Timeout 5\,s. \\
+  Bulkhead & Separate Thread-Pools für \texttt{identity}- und \texttt{catalog}-Aufrufe. \\
+\end{tabularx}
+
+
+
+\textbf{Akzeptiertes Restrisiko: Kein mTLS in v1.0 (TS1)}
+
+In v1.0 läuft die Service-zu-Service-Kommunikation innerhalb des
+Kubernetes-Clusters über \textbf{unverschlüsseltes HTTP}.
+Ein Angreifer mit Zugang zum internen Netz (z.\,B.\ durch einen
+kompromittierten Pod) könnte den Datenverkehr zwischen Services mitlesen.
+
+\textbf{Warum ist das für v1.0 tolerierbar?}
+\begin{itemize}[leftmargin=1.5em]
+  \item Das interne Kubernetes-Netzwerk ist durch \textbf{Network Policies}
+  segmentiert: Jeder Service kommuniziert nur mit explizit erlaubten Peers.
+  \item Der Perimeter ist durch TLS am API Gateway gesichert;
+  kein externer Traffic erreicht die Services direkt.
+  \item Das Betriebsteam hat in v1.0 kein ausreichendes Know-how für
+  Sidecar-Proxies und Zertifikatsrotation (Budget- und Zeitrahmen MVP).
+\end{itemize}
+
+\textbf{Unter welchen Bedingungen muss nachgebessert werden?}
+\begin{itemize}[leftmargin=1.5em]
+  \item Vor Go-Live eines zweiten Tenants (Multi-Tenancy v2.0, ADR-008):
+  Datentrennung auf Netzwerkebene wird dann zwingend.
+  \item Bei einem Security-Audit-Befund, der dieses Muster als
+  Critical/High einstuft (Kap.~1.1, Go-Live-Kriterium).
+  \item Spätestens mit Einführung von v2.0:
+  Linkerd ersetzt das fehlende mTLS vollständig (ADR-007, TS1).
+\end{itemize}
+Dieses Risiko ist als technische Schuld \textbf{TS1} erfasst und im
+Tilgungsplan verankert (Kap.~11).
+
+\subsection{Logging und Observability}
+
+Observability ist als Querschnittsanforderung in allen Services einheitlich
+umgesetzt. Strukturierte Logs, verteiltes Tracing und Prometheus-Metriken bilden
+zusammen die Grundlage für Fehleranalyse, Alerting und Kapazitätsplanung im Betrieb.
+
+\begin{tabularx}{\textwidth}{L{3cm} X}
+  \rowcolor{tableheader}
+  \color{white}\textbf{Aspekt} & \color{white}\textbf{Beschreibung} \\
+  Strukturiertes Logging & JSON-Format (Logback + SLF4J): \texttt{timestamp, level, service, correlationId, message, exception}. \\
+  \rowcolor{tablegrey}
+  Correlation-ID & UUID (\texttt{X-Correlation-ID}) wird als HTTP-Header propagiert und in alle Logs geschrieben. \\
+  PII-Schutz & E-Mail und Name werden vor dem Logging maskiert (Log-Scrubbing-Middleware). \\
+  \rowcolor{tablegrey}
+  Metriken & Prometheus (RED-Muster); exportiert via \texttt{/actuator/prometheus}. \\
+  Distributed Tracing & OpenTelemetry; Traces in Jaeger; \texttt{traceparent}-Header-Propagation. \\
+  \rowcolor{tablegrey}
+  Alerting & Error-Rate $>$ 1\,\%, P99-Latenz $>$ 1\,s, Queue-Tiefe $>$ 500, DLQ $>$ 0, DB-Pool $>$ 90\,\%, SSL-Expiry $<$ 30~Tage. \\
+\end{tabularx}
+
+\subsection{Datenpersistenz}
+
+Jeder Service verwaltet seine Daten vollständig autonom in einer eigenen
+PostgreSQL-Instanz. Kein Service greift direkt auf die Datenbank eines anderen
+zu -- Datenaustausch erfolgt ausschliesslich über Events. Dieses Muster
+garantiert lose Kopplung und ermöglicht unabhängige Schema-Migrationen.
+
+\begin{tabularx}{\textwidth}{L{3.5cm} X}
+  \rowcolor{tableheader}
+  \color{white}\textbf{Konzept} & \color{white}\textbf{Beschreibung} \\
+  Database per Service & Eigene PostgreSQL-DB je BC; kein Cross-Service-Zugriff. \\
+  \rowcolor{tablegrey}
+  Optimistic Locking & \texttt{version}-Feld im Aggregate; Konflikt $\to$ 409~Conflict + Client-Retry. \\
+  Transactional Outbox & Events atomar mit Domänenänderung; Relay-Prozess publiziert asynchron (vgl.\ ADR-009). \\
+  \rowcolor{tablegrey}
+  Schema-Migration & Flyway; versionierte SQL-Skripte; idempotent und rückwärtskompatibel. \\
+  Backups & Täglich; PITR~7~Tage; wöchentliche Restore-Tests. \\
+\end{tabularx}
+
+\subsection{API-Design-Richtlinien}
+
+Alle Services folgen denselben API-Design-Richtlinien, um eine konsistente
+Schnittstelle für Clients und Service-zu-Service-Kommunikation sicherzustellen.
+Grundlage ist ein \textbf{Contract-First-Ansatz} (ADR-011): Die
+OpenAPI-Spezifikation (\texttt{openapi/}\allowbreak \texttt{eduplanner-}\allowbreak \texttt{api.yaml}) ist die
+\emph{einzige Quelle der Wahrheit} -- Interfaces und Server-Stubs werden
+daraus generiert, nicht umgekehrt.
+Die vollständige Spezifikation liegt in Anhang~D.
+
+\subsubsection{Contract-First-Workflow}
+
+Im Contract-First-Ansatz wird die Reihenfolge gegenüber Code-First
+umgekehrt: Zuerst entsteht der Vertrag, dann der Code.
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{Spec schreiben:} Die Datei
+  \texttt{openapi/}\allowbreak \texttt{eduplanner-}\allowbreak \texttt{api.yaml} wird manuell gepflegt und
+  in Git versioniert. Sie ist der einzige Ort, an dem API-Änderungen
+  initiiert werden.
+  \item \textbf{Stubs generieren:} Der \texttt{openapi-}\allowbreak \texttt{generator-}\allowbreak \texttt{maven-}\allowbreak \texttt{plugin}
+  erzeugt beim Build automatisch Spring-Boot-Interfaces (Server-Stubs)
+  aus der Spec:
+\begin{lstlisting}
+<!-- pom.xml (Auszug) -->
+<plugin>
+  <groupId>org.openapitools</groupId>
+  <artifactId>openapi-generator-maven-plugin</artifactId>
+  <configuration>
+    <inputSpec>
+      ${project.basedir}/../../openapi/eduplanner-api.yaml
+    </inputSpec>
+    <generatorName>spring</generatorName>
+    <configOptions>
+      <interfaceOnly>true</interfaceOnly>
+      <useSpringBoot3>true</useSpringBoot3>
+      <useTags>true</useTags>
+    </configOptions>
+  </configuration>
+</plugin>
+\end{lstlisting}
+  \item \textbf{Implementieren:} Das Dev-Team implementiert die
+  generierten Interfaces (\texttt{CoursesApi}, \texttt{RegistrationsApi}
+  usw.). Der Compiler erzwingt Konformität -- eine Abweichung vom
+  Vertrag führt zu einem Build-Fehler.
+  \item \textbf{Swagger~UI bereitstellen:} Jeder Service stellt die
+  interaktive Swagger~UI unter
+  \texttt{/swagger-ui/index.html} bereit (via
+  \texttt{springdoc-}\allowbreak \texttt{openapi-}\allowbreak \texttt{starter-}\allowbreak \texttt{webmvc-}\allowbreak \texttt{ui}).
+  Die zugrundeliegende YAML-Datei ist unter
+  \texttt{/v3/api-docs.yaml} abrufbar.
+  \item \textbf{CI-Validierung:} Die Pipeline validiert die Spec vor
+  jedem Merge mit \texttt{vacuum} (Linting) und
+  \texttt{openapi-generator} (Generierbarkeit). Ein ungültiger
+  Vertrag blockiert den Build.
+\end{enumerate}
+
+\begin{reviewbox}[Contract-First -- Vorteile für EduPlanner]
+  \textbf{Frühe Einigung:} Frontend- und Backend-Team können parallel
+  entwickeln, sobald der Vertrag feststeht -- kein Warten auf
+  funktionierende Implementierungen.\\[4pt]
+  \textbf{Konsistenz:} Generierte Stubs und DTOs sind immer synchron
+  mit der Spec. Manuelle Abweichungen sind nicht möglich.\\[4pt]
+  \textbf{Contract Testing (TS2):} Pact-Tests validieren, dass
+  Consumer und Provider denselben Vertrag einhalten
+  (Tilgung Sprint~8, Kap.~11.2).
+\end{reviewbox}
+
+\subsubsection{API-Design-Regeln}
+
+\begin{itemize}[leftmargin=1.5em]
+  \item \textbf{RESTful:} Ressourcenorientierte URLs, korrekte HTTP-Verben
+  (GET\,/\,POST\,/\,PUT\,/\,DELETE).
+  \item \textbf{Versionierung:} \texttt{/api/v1/...} --
+  Breaking Changes führen zu einer neuen Major-Version
+  (\texttt{/api/v2/...}). Additive Änderungen sind rückwärtskompatibel.
+  \item \textbf{Swagger~UI:} Erreichbar unter
+  \texttt{/swagger-ui/index.html} pro Service. Zugriffsschutz in
+  Produktion via API-Gateway-Policy (nur internes Netz).
+  \item \textbf{Fehlerantworten:} RFC~7807 Problem Details
+  (\texttt{application/problem+json}) mit \texttt{type},
+  \texttt{title}, \texttt{status}, \texttt{detail}, \texttt{instance}
+  und optionalem \texttt{errors}-Array für Validierungsfehler.
+  \item \textbf{Pagination:} Cursor-basiert
+  (\texttt{?cursor=\ldots\&limit=20}, max.\ 100).
+  Kein Offset-Paging (inkonsistent bei hoher Schreiblast).
+  \item \textbf{Idempotency-Key:} Optionaler \texttt{Idempotency-Key}-Header
+  (UUID) bei allen POST-Endpunkten -- verhindert Doppeleinschreibungen
+  bei Netzwerkfehlern (vgl.\ Kap.~5.4).
+  \item \textbf{Authentifizierung:} RS256-signierter JWT Bearer Token;
+  Validierung am API Gateway; Services vertrauen dem weitergeleiteten
+  Header (Defense in Depth via lokales RBAC).
+\end{itemize}
+
+\begin{hinweis}[Beispiel: RFC~7807 Fehlerantwort]
+\begin{lstlisting}
+{
+  "type":     "https://eduplanner.skillbridge.ch/problems/validation-error",
+  "title":    "Validation Error",
+  "status":   400,
+  "detail":   "Das Feld 'title' darf nicht leer sein.",
+  "instance": "/api/v1/courses",
+  "errors":   [{ "field": "title", "message": "Darf nicht leer sein." }]
+}
+\end{lstlisting}
+\end{hinweis}
+
+\subsection{Teststrategie (Ebene 1--3)}
+
+Die Teststrategie folgt der Testpyramide: Schnelle, isolierte Unit-Tests bilden
+die Basis; Integration- und Contract-Tests sichern das Zusammenspiel der
+Komponenten; E2E- und Performance-Tests validieren das Systemverhalten unter
+realistischen Bedingungen. Security- und Chaos-Tests ergänzen die Strategie
+um Robustheit und Angriffssicherheit.
+
+\begin{tabularx}{\textwidth}{L{2.2cm} L{2.5cm} X L{3.0cm}}
+  \rowcolor{tableheader}
+  \color{white}\textbf{Testtyp} & \color{white}\textbf{Umfang} & \color{white}\textbf{Ziel} & \color{white}\textbf{Tool / Tooling} \\
+  Unit Tests & Einzelne Klassen / Aggregate & Functional Correctness; Business-Logik-Abdeckung $>$ 80\,\% & JUnit~5, Mockito. \\
+  \rowcolor{tablegrey}
+  Integration Tests & Slice (Controller $\to$ Repo) & Prüfung DB-Interaktion, JPA-Mappings, JSON-Serialisierung & Testcontainers (PostgreSQL). \\
+  Contract Tests & Service-Schnittstellen (CDC) & API-Kompatibilität zwischen catalog/sched/reg (Tilgung TS2) & Pact (geplant ab Sprint~8). \\
+  \rowcolor{tablegrey}
+  E2E Tests & Krit.\ Journeys & Staging-Deploy bricht bei Fehler & Cypress; Einschreibung, Stornierung, Veröffentlichung. \\
+  Performance & P95 $<$ 500\,ms & Staging-Alert bei Überschreitung & k6, 1\,000 concurrent users, wöchentlich. \\
+  \rowcolor{tablegrey}
+  Chaos Engineering & Wöchentlich & Ergebnisse im Wiki & Pod-Kills, Network-Delays (Chaos Mesh). \\
+  Security Tests & Vor Release & Release blockiert bei Critical/High & OWASP ZAP, Trivy, Snyk. \\
+\end{tabularx}

@@ -1,0 +1,81 @@
+@startuml ArchiveCourseSequenceDiagram
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam sequenceArrowColor #333333
+skinparam sequenceLifeLineBorderColor #333333
+skinparam sequenceLifeLineBackgroundColor #FFFFFF
+skinparam participantBackgroundColor #FFFFFF
+skinparam participantBorderColor #333333
+skinparam actorBackgroundColor #FFFFFF
+skinparam actorBorderColor #333333
+skinparam sequenceGroupBorderColor #999999
+skinparam sequenceGroupBackgroundColor #F5F5F5
+skinparam sequenceGroupBodyBackgroundColor #FAFAFA
+skinparam noteBorderColor #999999
+skinparam noteBackgroundColor #FFFFFF
+skinparam fontSize 11
+skinparam fontName Helvetica
+
+actor Admin as A
+participant "API Gateway" as GW
+participant "catalog-Service" as CAT
+participant "OutboxPublisher" as OP
+participant "Outbox-Relay" as OR
+participant "Message Broker" as MB
+participant "scheduling-Service" as SCH
+participant "registration-Service" as RS
+participant "notification-Service" as NS
+
+note over MB #FFFFFF
+  **NACK**: Nachricht nicht verarbeitet → Broker stellt erneut zu
+  **DLQ**: Nach 3 Fehlversuchen → Dead Letter Queue → Alert an On-Call
+end note
+
+A -> GW : PUT /api/v1/courses/{id}/archive + JWT
+GW -> GW : Token- & Rollenprüfung (ADMIN)
+GW -> CAT : Weiterleitung Request
+
+group Archivierung [DB-Transaktion]
+  CAT -> CAT : CourseStatus → ARCHIVED
+  CAT -> OP : schreibe CourseArchived\nin outbox-Tabelle
+  OP --> CAT : ✓
+end
+
+CAT --> A : 200 OK
+
+note over OR, MB : asynchron / Eventual Consistency ~2--5 Sek.
+
+OR -> MB : publiziere CourseArchived
+
+group scheduling konsumiert CourseArchived
+  MB -> SCH : CourseArchived
+  SCH -> SCH : alle Executions → CANCELLED
+  SCH -> OP : schreibe CourseExecutionCancelled\n(je Execution) in outbox-Tabelle
+  alt Fehler (max. 3 Versuche)
+    SCH --> MB : NACK → DLQ → Alert
+  end
+end
+
+OR -> MB : publiziere CourseExecutionCancelled
+
+group registration konsumiert CourseExecutionCancelled
+  MB -> RS : CourseExecutionCancelled
+  RS -> RS : alle Registrations → CANCELLED\n(idempotent via processed_events)
+  RS -> OP : schreibe RegistrationCancelled\n(je Registration) in outbox-Tabelle
+  alt Fehler (max. 3 Versuche)
+    RS --> MB : NACK → DLQ → Alert
+  end
+end
+
+OR -> MB : publiziere RegistrationCancelled
+
+group notification konsumiert RegistrationCancelled
+  MB -> NS : RegistrationCancelled
+  NS -> NS : rendere Stornierungsmail
+  alt E-Mail-Fehler (max. 3 Versuche)
+    NS --> MB : NACK → DLQ
+  end
+  NS --> A : Massenstornierungsmails\nan betroffene Teilnehmer
+end
+
+@enduml

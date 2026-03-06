@@ -1,0 +1,173 @@
+\section{Einführung und Ziele}
+
+Dieses Kapitel beschreibt die wesentlichen Anforderungen und Treiber, die bei der Architekturentscheidung berücksichtigt wurden: Aufgabenstellung, Geschäftskontext, Qualitätsziele und relevante Stakeholder.
+
+\subsection{Aufgabenstellung}
+
+Die SkillBridge AG ist ein mittelgrosses Schweizer Unternehmen mit Sitz in Biel/Bienne~(BE), das sich auf die Digitalisierung von Weiterbildungsangeboten für Berufsverbände, Bildungsinstitutionen und private Kursanbieter spezialisiert. Das Kernprodukt ist \textbf{EduPlanner} -- eine webbasierte Weiterbildungsplattform, die Kursanbieter bei der vollständigen Verwaltung ihres Kursgeschäfts unterstützt.
+
+EduPlanner bildet den gesamten Lebenszyklus eines Kursangebots ab -- von der Erstellung und Veröffentlichung über die Planung konkreter Durchführungen bis hin zur Einschreibung von Teilnehmern und der automatischen Kommunikation relevanter Ereignisse.
+
+\subsubsection{Geschäftskontext und Marktposition}
+
+EduPlanner positioniert sich als spezialisierte SaaS-Lösung für mittelständische Kursanbieter
+mit 10 bis 500 Mitarbeitenden. Im Wettbewerbsumfeld konkurriert die Plattform primär mit drei
+Alternativen: der manuellen Verwaltung über Excel oder Google Sheets, kostenintensiven
+Legacy-Systemen sowie generischen Learning Management Systems (LMS), denen dedizierte
+Kursplanungs-Funktionalitäten fehlen.
+
+
+Gegenüber diesen Alternativen differenziert sich EduPlanner durch vier Merkmale, die
+gleichzeitig zentrale Treiber der Architekturentscheidungen darstellen:
+
+\begin{itemize}[leftmargin=1.5em]
+  \item \textbf{Benutzerfreundlichkeit:} Eine intuitive Oberfläche für nicht-technisches Personal
+  erfordert klare UI-Richtlinien – konkret: maximal 3~Klicks pro Kernfunktion und
+  Ladezeiten unter 500\,ms.
+
+  \item \textbf{Schnelle Implementierung:} Das Ziel, innerhalb von 2~Wochen produktiv zu gehen,
+  macht eine vollständig automatisierte CI/CD-Pipeline zur Voraussetzung.
+
+  \item \textbf{Schweizer Datenschutz:} Die Einhaltung von DSGVO und DSG erfordert einen
+  Privacy-by-Design-Ansatz sowie eine Datenspeicherung ausschließlich in der EU
+  bzw.\ der Schweiz.
+
+  \item \textbf{API-First:} Um die Integration in bestehende Systemlandschaften zu ermöglichen,
+  sind eine vollständige OpenAPI-Dokumentation und eine klare Versionierungsstrategie
+  verbindlich.
+\end{itemize}
+
+
+\subsubsection{Erwartete Nutzungszahlen (Jahr~1)}
+\begin{itemize}[leftmargin=1.5em]
+  \item 5--20 Kursanbieter (Tenants)
+  \item 10--50 aktive Kurse im Katalog pro Anbieter
+  \item 50--500 Einschreibungen pro Monat
+  \item Bis zu 100 gleichzeitige Nutzer zu Spitzenzeiten
+\end{itemize}
+
+\subsubsection{Kernfunktionen des Systems}
+
+\begin{tabularx}{\textwidth}{L{3cm} X}
+  \rowcolor{tableheader}
+  \color{white}\textbf{Funktion} & \color{white}\textbf{Beschreibung} \\
+  Kurskatalog & Kurse anlegen, beschreiben, veröffentlichen und archivieren; Trainer zuordnen \\
+  \rowcolor{tablegrey}
+  Kursplanung & Konkrete Durchführungen (Termine, Orte, Kapazitäten) planen und verwalten \\
+  Einschreibung & Teilnehmer einschreiben, Wartelistenverwaltung, Stornierungen \\
+  \rowcolor{tablegrey}
+  Benachrichtigungen & Automatische E-Mails bei Einschreibung, Wartelistenaufnahme und Stornierung \\
+  Sicherheit & Rollenbasierte Zugriffskontrolle für alle Benutzergruppen \\
+  \rowcolor{tablegrey}
+  Reporting & Dashboard mit Auslastungsquoten, Teilnehmerstatistiken und Kursübersicht \\
+\end{tabularx}
+
+\subsubsection{Go-Live-Kriterien}
+
+\textbf{MVP (Minimum Viable Product) -- Monat 1--6:}
+\begin{itemize}[leftmargin=1.5em]
+  \item \textbf{Kurskatalog-Verwaltung:} Kurse können erstellt, bearbeitet,
+        veröffentlicht und gelöscht werden (vollständige CRUD-Operationen)
+  \item \textbf{Kursplanung:} Termine, Durchführungsorte und Teilnehmerkapazitäten
+        können pro Kurs erfasst und bearbeitet werden
+  \item \textbf{Einschreibung:} Teilnehmer können sich einschreiben; bei voller
+        Kapazität erfolgt automatische Aufnahme in die Warteliste mit
+        Nachrücklogik
+  \item \textbf{E-Mail-Benachrichtigungen:} Automatischer Versand bei Einschreibung,
+        Wartelistenaufnahme und Stornierung
+  \item \textbf{Zugriffskontrolle:} Vier Rollen (Admin, Kursanbieter, Trainer,
+        Teilnehmer) mit klar getrennten Berechtigungen sind vollständig
+        implementiert und getestet
+  \item \textbf{Verfügbarkeit:} System erreicht nachweislich 99,5\,\% Uptime
+        zu Kernzeiten im Staging-Betrieb (vgl.\ Q2)
+  \item \textbf{Überbuchungsschutz:} Kein einziger Fall einer Überbuchung in
+        den Integrationstests nachgewiesen (vgl.\ Q1)
+\end{itemize}
+
+\textbf{v1.0 (Vollständiger Release) -- Monat 7--12:}
+\begin{itemize}[leftmargin=1.5em]
+  \item \textbf{Erweiterte Planung:} Unterstützung mehrerer Durchführungen pro Kurs
+  (Multi-Execution) inkl.\ Konfliktprüfung bei Trainer- und Raumzuweisung
+  \item \textbf{Reporting:} Auslastungsberichte, Einschreibungsstatistiken und
+  Export-Funktion (CSV/PDF) für Kursanbieter
+  \item \textbf{API-Dokumentation:} Vollständige OpenAPI~3.0-Spezifikation für alle
+  öffentlichen Endpunkte, inkl.\ Beispielaufrufen und Fehlercode-Beschreibungen
+  \item \textbf{Performance-Verifikation:} Lasttest mit 1\,000 gleichzeitigen Nutzern
+  bestanden; Ladezeiten unter 500\,ms (Q6, Q11)
+  \item \textbf{Security-Audit:} Penetrationstest gemäss OWASP Top~10 durchgeführt
+  und alle kritischen Befunde behoben (Q5, Q7)
+  \item \textbf{Datenschutz-Audit:} Nachweis der DSGVO/DSG-Konformität durch
+  externen Audit bestätigt; Datenspeicherung ausschliesslich EU/Schweiz (Q12)
+\end{itemize}
+
+% ── 1.2 Qualitätsziele ────────────────────────────────────────
+\subsection{Qualitätsziele}
+
+\begin{tabularx}{\textwidth}{C{0.5cm} L{4.5cm} C{1.8cm} X}
+  \rowcolor{tableheader}
+  \color{white}\textbf{\#} & \color{white}\textbf{ISO-25010-Attribut\footnotemark} & \color{white}\textbf{Priorität} & \color{white}\textbf{Motivation} \\
+  1 & Functional Correctness & Kritisch & Einschreibungen und Kapazitätsprüfungen müssen stets konsistent sein. Eine Überbuchung ist geschäftskritisch und nicht tolerierbar. \\
+  \rowcolor{tablegrey}
+  2 & Reliability -- Availability & Hoch & Das System muss zu Kernzeiten (Mo--Fr, 07:00--22:00~Uhr) mit $\geq$\,99,5\,\% Verfügbarkeit betrieben werden. \\
+  3 & Maintainability & Hoch & Fachliche Domänen müssen unabhängig voneinander entwickelt, getestet und deployt werden können. \\
+  \rowcolor{tablegrey}
+  4 & Security & Hoch & RBAC muss sicherstellen, dass Nutzer ausschliesslich auf freigegebene Funktionen und Daten zugreifen. \\
+  5 & Usability & Mittel & Kernprozesse in $\leq$\,3~Klicks; Ladezeiten $<$\,500\,ms. \\
+  \rowcolor{tablegrey}
+  6 & Performance Efficiency & Mittel & P95-Ladezeit unter 500\,ms bei bis zu 1\,000 gleichzeitigen Nutzern (vgl.\ Q6, Q11). \\
+\end{tabularx}
+\footnotetext{ISO/IEC~25010 ist ein internationaler Standard, der Softwarequalität
+in acht übergeordnete Merkmale gliedert (u.\,a.\ \textit{Performance Efficiency},
+  \textit{Security}, \textit{Maintainability}, \textit{Reliability}). Jedes Merkmal
+  ist wiederum in konkrete Teilmerkmale unterteilt, die als messbare Qualitätsziele
+  in der Architektur verankert werden können.}
+
+
+
+
+% ── 1.3 Stakeholder ───────────────────────────────────────────
+\subsection{Stakeholder}
+
+\begin{tabularx}{\textwidth}{L{2.2cm} L{3.5cm} X}
+  \rowcolor{tableheader}
+  \color{white}\textbf{Rolle} & \color{white}\textbf{Name / Funktion} & \color{white}\textbf{Erwartungen / Interessen} \\
+  Auftraggeber & Sandra Meier, CEO &
+  Erwartet messbaren ROI durch Reduktion manueller Verwaltungsaufwände.
+  Das System soll mit wachsender Kundenzahl skalieren, ohne proportional
+  mehr Personal zu erfordern. Entscheidet über Budget und Go/No-Go. \\
+  \rowcolor{tablegrey}
+  Product Owner & Thomas Zbinden, Leiter Produktentwicklung &
+  Verantwortet die termingerechte Lieferung aller vereinbarten Features.
+  Priorisiert den Backlog, nimmt Sprints ab und stellt sicher, dass
+  fachliche Anforderungen korrekt umgesetzt werden. \\
+  Fachbereich & Kursplanungs-Team &
+  Nutzt das System täglich für die operative Planung. Erwartet eine
+  intuitive Oberfläche ohne Schulungsaufwand, eine übersichtliche
+  Kalenderansicht sowie schnelle Reaktionszeiten bei der Dateneingabe. \\
+  \rowcolor{tablegrey}
+  Endbenutzer & Teilnehmer &
+  Benötigen einen reibungslosen Self-Service: Kurssuche, Einschreibung
+  und Stornierung in wenigen Klicks. Erwarten zuverlässige
+  Bestätigungs- und Erinnerungsbenachrichtigungen per E-Mail. \\
+  Endbenutzer & Trainer (Kursleiter) &
+  Benötigen eine persönliche Übersicht ihrer zugewiesenen Durchführungen,
+  Termine und Teilnehmerlisten. Erwarten rechtzeitige Benachrichtigung
+  bei Änderungen oder Stornierungen. \\
+  \rowcolor{tablegrey}
+  Betrieb & Patrick Hari, IT-Leiter &
+  Verantwortet den stabilen Betrieb der Plattform. Erwartet einfaches
+  Deployment via CI/CD, aussagekräftiges Monitoring und Alerting sowie
+  klar dokumentierte Konfigurationsparameter ohne Eingriffe ins
+  Quellcode. \\
+  Entwicklung & Dev-Team &
+  Benötigt eine klar strukturierte, gut dokumentierte Architektur mit
+  hoher Testabdeckung. Erwartet automatisierte CI/CD-Pipelines, saubere
+  Schnittstellendefinitionen zwischen den Services und geringe
+  Kopplungen zwischen den Bounded Contexts. \\
+  \rowcolor{tablegrey}
+  Datenschutz & Andrea Senn, CISO &
+  Stellt die Einhaltung von DSGVO und Schweizer DSG sicher. Erwartet
+  Privacy-by-Design, eine revisionssichere Protokollierung von
+  Datenzugriffen sowie eine starke Authentifizierung und
+  rollenbasierte Zugriffskontrolle für alle personenbezogenen Daten. \\
+\end{tabularx}

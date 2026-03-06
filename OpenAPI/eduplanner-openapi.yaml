@@ -1,0 +1,1798 @@
+openapi: 3.1.0
+info:
+  title: EduPlanner API
+  description: |
+    Weiterbildungsplattform für Kursanbieter – REST API Spezifikation.
+
+    ## Überblick
+    EduPlanner bildet den gesamten Lebenszyklus eines Kursangebots ab:
+    von der Erstellung und Veröffentlichung über die Planung konkreter
+    Durchführungen bis hin zur Einschreibung von Teilnehmern und der
+    automatischen Kommunikation relevanter Ereignisse.
+
+    ## Authentifizierung
+    Alle Endpunkte erfordern einen gültigen JWT Bearer Token (RS256),
+    ausgestellt vom externen OIDC Identity Provider (Keycloak / Azure AD).
+    Das Token wird am API Gateway validiert und an alle nachgelagerten
+    Services weitergeleitet.
+
+    ## Rollen (RBAC)
+    | Rolle       | Beschreibung                                      |
+    |-------------|---------------------------------------------------|
+    | ADMIN       | Vollzugriff inkl. Veröffentlichung & Archivierung |
+    | STAFF       | Kurs- und Durchführungsverwaltung                 |
+    | TRAINER     | Lesezugriff auf eigene Durchführungen             |
+    | PARTICIPANT | Self-Service: Einschreibung & Stornierung         |
+
+    ## Fehlerantworten
+    Alle Fehlerantworten folgen RFC 7807 Problem Details (`application/problem+json`).
+
+    ## Versionierung
+    Breaking Changes führen zu einer neuen Major-Version (`/api/v2/...`).
+
+  version: 1.0.0
+  contact:
+    name: SkillBridge AG – Entwicklungsteam
+    email: dev@skillbridge.ch
+  license:
+    name: Proprietär – Intern
+  x-logo:
+    url: https://skillbridge.ch/logo.png
+
+servers:
+  - url: https://api.eduplanner.skillbridge.ch/api/v1
+    description: Produktionsumgebung (Azure Switzerland North)
+  - url: https://staging-api.eduplanner.skillbridge.ch/api/v1
+    description: Staging-Umgebung
+  - url: http://localhost:8080/api/v1
+    description: Lokale Entwicklungsumgebung (Docker Compose)
+
+tags:
+  - name: Catalog
+    description: |
+      Kursbeschreibungen, Lernziele und Trainer-Profile verwalten.
+      Definiert **was** angeboten wird. (`catalog`-Service)
+  - name: Scheduling
+    description: |
+      Kursdurchführungen, Termine, Kapazitäten und Trainer-Zuweisung.
+      Definiert **wann** und **wie**. (`scheduling`-Service)
+  - name: Registration
+    description: |
+      Einschreibungen, Warteliste, Kapazitätsprüfung und Stornierungen.
+      Verwaltet **wer** teilnimmt. (`registration`-Service) – kritischster Service.
+  - name: Identity
+    description: |
+      Benutzer- und Rollenverwaltung. Authentifizierung via externem OIDC-Provider.
+      (`identity`-Service)
+  - name: Notification
+    description: |
+      Vollständig event-getrieben – keine direkten API-Endpunkte für Clients.
+      E-Mails werden ausschliesslich als Reaktion auf Domain Events versendet.
+      (`notification`-Service)
+
+# ============================================================
+#  PATHS
+# ============================================================
+paths:
+
+  # ----------------------------------------------------------
+  #  CATALOG – Kurse
+  # ----------------------------------------------------------
+  /courses:
+    get:
+      tags: [Catalog]
+      summary: Kursliste abrufen
+      description: |
+        Gibt alle Kurse zurück, auf die der anfragende Nutzer Zugriff hat.
+        Teilnehmer sehen nur Kurse im Status `PUBLISHED`.
+        Staff und Admin sehen alle Kurse inkl. `DRAFT` und `ARCHIVED`.
+      operationId: listCourses
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/cursorParam'
+        - $ref: '#/components/parameters/limitParam'
+        - name: status
+          in: query
+          description: Filter nach CourseStatus
+          schema:
+            $ref: '#/components/schemas/CourseStatus'
+        - name: trainerId
+          in: query
+          description: Filter nach zugewiesenem Trainer (UUID)
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Erfolgreiche Antwort
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags: [Catalog]
+      summary: Neuen Kurs anlegen
+      description: |
+        Legt einen neuen Kurs im Status `DRAFT` an.
+        **Erforderliche Rollen:** `ADMIN`, `STAFF`
+      operationId: createCourse
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCourseRequest'
+            example:
+              title: "Python für Einsteiger"
+              description: "Grundlagen der Programmiersprache Python"
+              learningObjectives:
+                - "Variablen und Datentypen verstehen"
+                - "Kontrollstrukturen anwenden"
+              trainerId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+      responses:
+        '201':
+          description: Kurs erfolgreich angelegt
+          headers:
+            Location:
+              description: URL des neu erstellten Kurses
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Course'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /courses/{courseId}:
+    get:
+      tags: [Catalog]
+      summary: Kurs nach ID abrufen
+      operationId: getCourseById
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/courseIdParam'
+      responses:
+        '200':
+          description: Kursdetails
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Course'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Catalog]
+      summary: Kursmetadaten aktualisieren
+      description: |
+        Aktualisiert Titel, Beschreibung und Lernziele eines Kurses.
+        Nur erlaubt, solange der Kurs im Status `DRAFT` oder `PUBLISHED` ist.
+        **Erforderliche Rollen:** `ADMIN`, `STAFF`
+      operationId: updateCourse
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/courseIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCourseRequest'
+      responses:
+        '200':
+          description: Kurs aktualisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Course'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+    delete:
+      tags: [Catalog]
+      summary: Kurs löschen (nur DRAFT)
+      description: |
+        Löscht einen Kurs dauerhaft. Nur erlaubt, wenn der Status `DRAFT` ist.
+        Veröffentlichte Kurse müssen archiviert werden.
+        **Erforderliche Rollen:** `ADMIN`
+      operationId: deleteCourse
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/courseIdParam'
+      responses:
+        '204':
+          description: Kurs gelöscht
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /courses/{courseId}/publish:
+    put:
+      tags: [Catalog]
+      summary: Kurs veröffentlichen (DRAFT → PUBLISHED)
+      description: |
+        Setzt den CourseStatus von `DRAFT` auf `PUBLISHED`.
+        Der Kurs wird für Teilnehmer sichtbar und Einschreibungen werden möglich.
+        Publiziert Domain Event `CoursePublished`.
+        **Erforderliche Rollen:** `ADMIN`
+      operationId: publishCourse
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/courseIdParam'
+      responses:
+        '200':
+          description: Kurs veröffentlicht
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Course'
+        '400':
+          description: Kurs ist nicht im Status DRAFT
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /courses/{courseId}/archive:
+    put:
+      tags: [Catalog]
+      summary: Kurs archivieren (PUBLISHED → ARCHIVED)
+      description: |
+        Setzt den CourseStatus von `PUBLISHED` auf `ARCHIVED`.
+        Rückwärtsübergänge sind nicht erlaubt (ADR-006).
+        Löst eine Kaskade aus: Alle offenen Durchführungen und
+        Einschreibungen werden storniert (Eventual Consistency ~2–5 Sek.).
+        Publiziert Domain Event `CourseArchived`.
+        **Erforderliche Rollen:** `ADMIN`
+      operationId: archiveCourse
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/courseIdParam'
+      responses:
+        '200':
+          description: Kurs archiviert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Course'
+        '400':
+          description: Kurs ist nicht im Status PUBLISHED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ----------------------------------------------------------
+  #  CATALOG – Trainer-Profile
+  # ----------------------------------------------------------
+  /trainers:
+    get:
+      tags: [Catalog]
+      summary: Alle Trainer-Profile abrufen
+      operationId: listTrainers
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/cursorParam'
+        - $ref: '#/components/parameters/limitParam'
+      responses:
+        '200':
+          description: Liste der Trainer-Profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrainerListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Catalog]
+      summary: Trainer-Profil anlegen
+      description: |
+        **Erforderliche Rollen:** `ADMIN`, `STAFF`
+      operationId: createTrainer
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTrainerRequest'
+      responses:
+        '201':
+          description: Trainer-Profil angelegt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrainerProfile'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /trainers/{trainerId}:
+    get:
+      tags: [Catalog]
+      summary: Trainer-Profil nach ID abrufen
+      operationId: getTrainerById
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/trainerIdParam'
+      responses:
+        '200':
+          description: Trainer-Profil
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrainerProfile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Catalog]
+      summary: Trainer-Profil aktualisieren
+      description: |
+        **Erforderliche Rollen:** `ADMIN`, `STAFF`
+      operationId: updateTrainer
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/trainerIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTrainerRequest'
+      responses:
+        '200':
+          description: Trainer-Profil aktualisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrainerProfile'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ----------------------------------------------------------
+  #  SCHEDULING – Durchführungen
+  # ----------------------------------------------------------
+  /executions:
+    get:
+      tags: [Scheduling]
+      summary: Alle Kursdurchführungen abrufen
+      description: |
+        Gibt Kursdurchführungen zurück. Teilnehmer sehen nur `PUBLISHED`-Durchführungen.
+        Trainer sehen nur ihre eigenen Durchführungen.
+      operationId: listExecutions
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/cursorParam'
+        - $ref: '#/components/parameters/limitParam'
+        - name: courseId
+          in: query
+          description: Filter nach Kurs-ID
+          schema:
+            type: string
+            format: uuid
+        - name: trainerId
+          in: query
+          description: Filter nach Trainer-ID
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/ExecutionStatus'
+        - name: from
+          in: query
+          description: Startdatum Filter (ISO 8601)
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          description: Enddatum Filter (ISO 8601)
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Liste der Durchführungen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Scheduling]
+      summary: Neue Kursdurchführung planen
+      description: |
+        Plant eine neue Durchführung für einen bestehenden Kurs.
+        Prüft automatisch auf Trainer-Doppelbuchungen (transaktionale Locks).
+        Publiziert Domain Event `CourseExecutionScheduled`.
+        **Erforderliche Rollen:** `ADMIN`, `STAFF`
+      operationId: createExecution
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateExecutionRequest'
+            example:
+              courseId: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              startDate: "2026-09-01"
+              endDate: "2026-09-02"
+              location: "HFTM Grenchen, Raum 201"
+              maxCapacity: 12
+              trainerId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+      responses:
+        '201':
+          description: Durchführung erfolgreich geplant
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseExecution'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Trainer-Doppelbuchung oder Kapazitätskonflikt
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+
+  /executions/{executionId}:
+    get:
+      tags: [Scheduling]
+      summary: Durchführung nach ID abrufen
+      operationId: getExecutionById
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/executionIdParam'
+      responses:
+        '200':
+          description: Durchführungsdetails
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseExecution'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Scheduling]
+      summary: Durchführung aktualisieren
+      description: |
+        Aktualisiert Datum, Ort, Kapazität oder Trainer einer Durchführung.
+        **Erforderliche Rollen:** `ADMIN`, `STAFF`
+      operationId: updateExecution
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/executionIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateExecutionRequest'
+      responses:
+        '200':
+          description: Durchführung aktualisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseExecution'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /executions/{executionId}/publish:
+    put:
+      tags: [Scheduling]
+      summary: Durchführung veröffentlichen (PLANNED → PUBLISHED)
+      description: |
+        Gibt die Durchführung frei. Ab diesem Zeitpunkt können sich
+        Teilnehmer einschreiben. Publiziert `CourseExecutionPublished`.
+        **Erforderliche Rollen:** `ADMIN`
+      operationId: publishExecution
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/executionIdParam'
+      responses:
+        '200':
+          description: Durchführung veröffentlicht
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseExecution'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /executions/{executionId}/cancel:
+    put:
+      tags: [Scheduling]
+      summary: Durchführung absagen (→ CANCELLED)
+      description: |
+        Sagt eine Durchführung ab. Alle eingeschriebenen Teilnehmer
+        werden automatisch storniert (via Domain Events, Eventual Consistency).
+        Publiziert `CourseExecutionCancelled`.
+        **Erforderliche Rollen:** `ADMIN`
+      operationId: cancelExecution
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/executionIdParam'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  description: Optionaler Stornierungsgrund
+                  maxLength: 500
+      responses:
+        '200':
+          description: Durchführung abgesagt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseExecution'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /executions/{executionId}/participants:
+    get:
+      tags: [Scheduling]
+      summary: Teilnehmerliste einer Durchführung abrufen
+      description: |
+        Gibt alle eingeschriebenen Teilnehmer zurück.
+        **Erforderliche Rollen:** `ADMIN`, `STAFF`, `TRAINER` (nur eigene Durchführungen)
+      operationId: getExecutionParticipants
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/executionIdParam'
+      responses:
+        '200':
+          description: Teilnehmerliste
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParticipantListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ----------------------------------------------------------
+  #  REGISTRATION – Einschreibungen
+  # ----------------------------------------------------------
+  /registrations:
+    get:
+      tags: [Registration]
+      summary: Einschreibungen abrufen
+      description: |
+        Gibt Einschreibungen zurück.
+        - `PARTICIPANT` sieht nur eigene Einschreibungen.
+        - `ADMIN` / `STAFF` sehen alle Einschreibungen.
+      operationId: listRegistrations
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/cursorParam'
+        - $ref: '#/components/parameters/limitParam'
+        - name: executionId
+          in: query
+          description: Filter nach Durchführungs-ID
+          schema:
+            type: string
+            format: uuid
+        - name: userId
+          in: query
+          description: Filter nach Benutzer-ID (nur ADMIN/STAFF)
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/RegistrationStatus'
+      responses:
+        '200':
+          description: Liste der Einschreibungen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistrationListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Registration]
+      summary: Für eine Kursdurchführung einschreiben
+      description: |
+        Schreibt den angegebenen Nutzer für eine Durchführung ein.
+        
+        **Kapazitätsprüfung (Optimistic Locking):**
+        - Kapazität > 0 → Einschreibung `REGISTERED`, Antwort `201 Created`
+        - Kapazität = 0 → Wartelisteneintrag, Antwort `202 Accepted`
+        
+        Das Domain Event `ParticipantRegistered` bzw.
+        `ParticipantAddedToWaitlist` wird atomar via Transactional Outbox
+        persistiert. Eine Bestätigungs-E-Mail wird asynchron versendet.
+        
+        **Erforderliche Rollen:** `ADMIN`, `STAFF`, `TRAINER`, `PARTICIPANT`
+        
+        **Idempotency:** Optionaler `Idempotency-Key` Header verhindert
+        Doppeleinschreibungen bei Netzwerkfehlern.
+      operationId: createRegistration
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          description: UUID zur Vermeidung von Doppeleinschreibungen
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRegistrationRequest'
+            example:
+              executionId: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              userId: "9b8e7d6c-5a4b-3210-fedc-ba9876543210"
+      responses:
+        '201':
+          description: Einschreibung erfolgreich (Platz verfügbar)
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Registration'
+        '202':
+          description: Kurs ausgebucht – auf Warteliste aufgenommen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WaitlistRegistration'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Durchführung nicht gefunden oder nicht PUBLISHED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '409':
+          description: Nutzer ist bereits eingeschrieben
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+
+  /registrations/{registrationId}:
+    get:
+      tags: [Registration]
+      summary: Einschreibung nach ID abrufen
+      operationId: getRegistrationById
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/registrationIdParam'
+      responses:
+        '200':
+          description: Einschreibungsdetails
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Registration'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Registration]
+      summary: Einschreibung stornieren
+      description: |
+        Storniert eine Einschreibung. Nur eigene Einschreibungen
+        dürfen storniert werden (403 Forbidden sonst).
+        
+        **Nachrücklogik:** Ist die Warteliste nicht leer, rückt der
+        älteste Eintrag automatisch nach (asynchron via Events).
+        
+        Publiziert `RegistrationCancelled` und ggf.
+        `WaitlistParticipantPromoted`.
+        
+        **Erforderliche Rollen:** `ADMIN`, `STAFF`, `TRAINER`, `PARTICIPANT`
+        (nur eigene Einschreibung)
+      operationId: cancelRegistration
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/registrationIdParam'
+      responses:
+        '204':
+          description: Einschreibung storniert
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Zugriff verweigert – nicht eigene Einschreibung
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /registrations/{registrationId}/waitlist-position:
+    get:
+      tags: [Registration]
+      summary: Wartelistenposition abrufen
+      description: Gibt die aktuelle Position auf der Warteliste zurück.
+      operationId: getWaitlistPosition
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/registrationIdParam'
+      responses:
+        '200':
+          description: Aktuelle Wartelistenposition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WaitlistPosition'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ----------------------------------------------------------
+  #  IDENTITY – Benutzer & Rollen
+  # ----------------------------------------------------------
+  /users:
+    get:
+      tags: [Identity]
+      summary: Benutzerliste abrufen
+      description: |
+        **Erforderliche Rollen:** `ADMIN`
+      operationId: listUsers
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/cursorParam'
+        - $ref: '#/components/parameters/limitParam'
+        - name: role
+          in: query
+          description: Filter nach Systemrolle
+          schema:
+            $ref: '#/components/schemas/UserRole'
+      responses:
+        '200':
+          description: Benutzerliste
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /users/{userId}:
+    get:
+      tags: [Identity]
+      summary: Benutzer nach ID abrufen
+      description: |
+        **Erforderliche Rollen:** `ADMIN` oder eigenes Profil
+      operationId: getUserById
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/userIdParam'
+      responses:
+        '200':
+          description: Benutzerdetails
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /users/{userId}/roles:
+    get:
+      tags: [Identity]
+      summary: Rollen eines Benutzers abrufen
+      description: |
+        **Erforderliche Rollen:** `ADMIN`
+      operationId: getUserRoles
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/userIdParam'
+      responses:
+        '200':
+          description: Rollenliste
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  userId:
+                    type: string
+                    format: uuid
+                  roles:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UserRole'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Identity]
+      summary: Rollen eines Benutzers aktualisieren
+      description: |
+        Ersetzt alle Rollen eines Benutzers. Mehrere Rollen sind möglich
+        (z. B. `TRAINER` + `PARTICIPANT`).
+        Publiziert Domain Event `UserRoleAssigned`.
+        **Erforderliche Rollen:** `ADMIN`
+      operationId: updateUserRoles
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/userIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [roles]
+              properties:
+                roles:
+                  type: array
+                  minItems: 1
+                  items:
+                    $ref: '#/components/schemas/UserRole'
+            example:
+              roles: ["TRAINER", "PARTICIPANT"]
+      responses:
+        '200':
+          description: Rollen aktualisiert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /users/{userId}/delete-pii:
+    delete:
+      tags: [Identity]
+      summary: Personenbezogene Daten löschen (DSGVO Art. 17)
+      description: |
+        Löscht oder anonymisiert alle personenbezogenen Daten (PII) eines Nutzers
+        innerhalb von 30 Tagen gemäss DSGVO Art. 17 / revDSG Art. 32.
+        Einschreibungshistorie wird anonymisiert (userId → anonymized).
+        **Erforderliche Rollen:** `ADMIN`
+      operationId: deleteUserPii
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/userIdParam'
+      responses:
+        '202':
+          description: Löschanfrage angenommen – wird innerhalb von 30 Tagen verarbeitet
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                    format: uuid
+                  estimatedCompletionDate:
+                    type: string
+                    format: date
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /me:
+    get:
+      tags: [Identity]
+      summary: Eigenes Profil abrufen
+      description: Gibt das Profil des authentifizierten Nutzers zurück.
+      operationId: getMyProfile
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Eigenes Profil
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+# ============================================================
+#  COMPONENTS
+# ============================================================
+components:
+
+  # ----------------------------------------------------------
+  #  Security Schemes
+  # ----------------------------------------------------------
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        RS256-signierter JWT Bearer Token, ausgestellt vom OIDC Identity Provider.
+        Token-Struktur (Payload-Auszug):
+        ```json
+        {
+          "sub": "user-uuid-123",
+          "roles": ["PARTICIPANT"],
+          "locale": "de",
+          "tenant_id": "skillbridge",
+          "exp": 1700000900
+        }
+        ```
+        Access Token Laufzeit: 15 Minuten. Refresh Token: 8 Stunden.
+
+  # ----------------------------------------------------------
+  #  Parameters
+  # ----------------------------------------------------------
+  parameters:
+    courseIdParam:
+      name: courseId
+      in: path
+      required: true
+      description: Eindeutige Kurs-ID (UUID)
+      schema:
+        type: string
+        format: uuid
+      example: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+
+    executionIdParam:
+      name: executionId
+      in: path
+      required: true
+      description: Eindeutige Durchführungs-ID (UUID)
+      schema:
+        type: string
+        format: uuid
+
+    registrationIdParam:
+      name: registrationId
+      in: path
+      required: true
+      description: Eindeutige Einschreibungs-ID (UUID)
+      schema:
+        type: string
+        format: uuid
+
+    trainerIdParam:
+      name: trainerId
+      in: path
+      required: true
+      description: Eindeutige Trainer-ID (UUID)
+      schema:
+        type: string
+        format: uuid
+
+    userIdParam:
+      name: userId
+      in: path
+      required: true
+      description: Eindeutige Benutzer-ID (UUID)
+      schema:
+        type: string
+        format: uuid
+
+    cursorParam:
+      name: cursor
+      in: query
+      description: Cursor für cursor-basierte Pagination
+      schema:
+        type: string
+
+    limitParam:
+      name: limit
+      in: query
+      description: Maximale Anzahl Ergebnisse pro Seite (Standard 20, max 100)
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+  # ----------------------------------------------------------
+  #  Responses
+  # ----------------------------------------------------------
+  responses:
+    BadRequest:
+      description: Ungültige Anfrage
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: "https://eduplanner.skillbridge.ch/problems/validation-error"
+            title: "Validation Error"
+            status: 400
+            detail: "Das Feld 'title' darf nicht leer sein."
+            instance: "/api/v1/courses"
+
+    Unauthorized:
+      description: Nicht authentifiziert – fehlendes oder ungültiges JWT
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: "https://eduplanner.skillbridge.ch/problems/unauthorized"
+            title: "Unauthorized"
+            status: 401
+            detail: "JWT Token fehlt oder ist abgelaufen."
+
+    Forbidden:
+      description: Zugriff verweigert – fehlende Rolle
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: "https://eduplanner.skillbridge.ch/problems/forbidden"
+            title: "Forbidden"
+            status: 403
+            detail: "Rolle ADMIN erforderlich."
+
+    NotFound:
+      description: Ressource nicht gefunden
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: "https://eduplanner.skillbridge.ch/problems/not-found"
+            title: "Not Found"
+            status: 404
+            detail: "Kurs mit ID 'xyz' nicht gefunden."
+
+    Conflict:
+      description: Konflikt – z. B. Optimistic Locking Fehler (Version veraltet)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: "https://eduplanner.skillbridge.ch/problems/conflict"
+            title: "Conflict"
+            status: 409
+            detail: "Die Ressource wurde zwischenzeitlich geändert. Bitte erneut laden."
+
+  # ----------------------------------------------------------
+  #  Schemas
+  # ----------------------------------------------------------
+  schemas:
+
+    # ---------- Enums ----------
+    CourseStatus:
+      type: string
+      enum: [DRAFT, PUBLISHED, ARCHIVED]
+      description: |
+        Zustandsmaschine eines Kurses (keine Rückwärtsübergänge erlaubt):
+        - `DRAFT` – in Bearbeitung, nicht für Teilnehmer sichtbar
+        - `PUBLISHED` – sichtbar, Einschreibungen möglich
+        - `ARCHIVED` – abgeschlossen, keine Einschreibungen mehr möglich
+
+    ExecutionStatus:
+      type: string
+      enum: [PLANNED, PUBLISHED, CANCELLED]
+      description: |
+        - `PLANNED` – geplant, noch nicht freigegeben
+        - `PUBLISHED` – freigegeben, Einschreibungen möglich
+        - `CANCELLED` – abgesagt
+
+    RegistrationStatus:
+      type: string
+      enum: [REGISTERED, CANCELLED]
+      description: |
+        - `REGISTERED` – aktive Einschreibung
+        - `CANCELLED` – storniert
+
+    UserRole:
+      type: string
+      enum: [ADMIN, STAFF, TRAINER, PARTICIPANT]
+      description: Systemrolle eines Benutzers (Mehrfachrollen möglich)
+
+    # ---------- Domain Models ----------
+    Course:
+      type: object
+      required:
+        - courseId
+        - title
+        - status
+        - createdAt
+        - updatedAt
+        - version
+      properties:
+        courseId:
+          type: string
+          format: uuid
+          description: Eindeutige Kurs-ID
+          readOnly: true
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Kurstitel
+        description:
+          type: string
+          maxLength: 5000
+          description: Kursbeschreibung
+        learningObjectives:
+          type: array
+          items:
+            type: string
+            maxLength: 500
+          description: Lernziele des Kurses
+        status:
+          $ref: '#/components/schemas/CourseStatus'
+        trainer:
+          $ref: '#/components/schemas/TrainerProfileSummary'
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        version:
+          type: integer
+          format: int64
+          description: Optimistic Locking Version
+          readOnly: true
+      example:
+        courseId: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+        title: "Python für Einsteiger"
+        description: "Grundlagen der Programmiersprache Python"
+        learningObjectives:
+          - "Variablen und Datentypen verstehen"
+          - "Kontrollstrukturen anwenden"
+        status: "PUBLISHED"
+        trainer:
+          trainerId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          fullName: "Max Muster"
+        createdAt: "2026-01-15T10:00:00Z"
+        updatedAt: "2026-03-01T14:30:00Z"
+        version: 3
+
+    CreateCourseRequest:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 5000
+        learningObjectives:
+          type: array
+          items:
+            type: string
+            maxLength: 500
+        trainerId:
+          type: string
+          format: uuid
+          description: Optionale Trainer-Zuweisung
+
+    UpdateCourseRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 5000
+        learningObjectives:
+          type: array
+          items:
+            type: string
+            maxLength: 500
+        trainerId:
+          type: string
+          format: uuid
+
+    CourseListResponse:
+      type: object
+      required: [data, pagination]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Course'
+        pagination:
+          $ref: '#/components/schemas/PaginationInfo'
+
+    TrainerProfile:
+      type: object
+      required: [trainerId, fullName, createdAt]
+      properties:
+        trainerId:
+          type: string
+          format: uuid
+          readOnly: true
+        fullName:
+          type: string
+          maxLength: 200
+        biography:
+          type: string
+          maxLength: 2000
+        specializations:
+          type: array
+          items:
+            type: string
+        availabilityStatus:
+          type: string
+          enum: [AVAILABLE, UNAVAILABLE]
+          default: AVAILABLE
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+
+    TrainerProfileSummary:
+      type: object
+      properties:
+        trainerId:
+          type: string
+          format: uuid
+        fullName:
+          type: string
+
+    CreateTrainerRequest:
+      type: object
+      required: [fullName]
+      properties:
+        fullName:
+          type: string
+          minLength: 1
+          maxLength: 200
+        biography:
+          type: string
+          maxLength: 2000
+        specializations:
+          type: array
+          items:
+            type: string
+
+    UpdateTrainerRequest:
+      type: object
+      properties:
+        fullName:
+          type: string
+          maxLength: 200
+        biography:
+          type: string
+          maxLength: 2000
+        specializations:
+          type: array
+          items:
+            type: string
+        availabilityStatus:
+          type: string
+          enum: [AVAILABLE, UNAVAILABLE]
+
+    TrainerListResponse:
+      type: object
+      required: [data, pagination]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/TrainerProfile'
+        pagination:
+          $ref: '#/components/schemas/PaginationInfo'
+
+    CourseExecution:
+      type: object
+      required:
+        - executionId
+        - courseId
+        - startDate
+        - endDate
+        - location
+        - maxCapacity
+        - remainingCapacity
+        - status
+        - createdAt
+        - version
+      properties:
+        executionId:
+          type: string
+          format: uuid
+          readOnly: true
+        courseId:
+          type: string
+          format: uuid
+          description: Referenz auf den Kurs (Anti-Corruption Layer – nur ID)
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        location:
+          type: string
+          maxLength: 300
+        maxCapacity:
+          type: integer
+          minimum: 1
+          maximum: 1000
+        remainingCapacity:
+          type: integer
+          minimum: 0
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/ExecutionStatus'
+        trainerId:
+          type: string
+          format: uuid
+          description: Zugewiesener Trainer
+        slots:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExecutionSlot'
+          description: Zeitblöcke der Durchführung
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+        version:
+          type: integer
+          format: int64
+          readOnly: true
+      example:
+        executionId: "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+        courseId: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+        startDate: "2026-09-01"
+        endDate: "2026-09-02"
+        location: "HFTM Grenchen, Raum 201"
+        maxCapacity: 12
+        remainingCapacity: 5
+        status: "PUBLISHED"
+        trainerId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        createdAt: "2026-03-01T09:00:00Z"
+        updatedAt: "2026-03-15T11:00:00Z"
+        version: 2
+
+    ExecutionSlot:
+      type: object
+      required: [startDateTime, endDateTime]
+      properties:
+        startDateTime:
+          type: string
+          format: date-time
+        endDateTime:
+          type: string
+          format: date-time
+
+    CreateExecutionRequest:
+      type: object
+      required: [courseId, startDate, endDate, location, maxCapacity]
+      properties:
+        courseId:
+          type: string
+          format: uuid
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        location:
+          type: string
+          maxLength: 300
+        maxCapacity:
+          type: integer
+          minimum: 1
+          maximum: 1000
+        trainerId:
+          type: string
+          format: uuid
+
+    UpdateExecutionRequest:
+      type: object
+      properties:
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        location:
+          type: string
+          maxLength: 300
+        maxCapacity:
+          type: integer
+          minimum: 1
+        trainerId:
+          type: string
+          format: uuid
+
+    ExecutionListResponse:
+      type: object
+      required: [data, pagination]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/CourseExecution'
+        pagination:
+          $ref: '#/components/schemas/PaginationInfo'
+
+    Registration:
+      type: object
+      required:
+        - registrationId
+        - executionId
+        - userId
+        - status
+        - registeredAt
+        - version
+      properties:
+        registrationId:
+          type: string
+          format: uuid
+          readOnly: true
+        executionId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+          description: Referenz auf den Teilnehmer (kein PII in Events)
+        status:
+          $ref: '#/components/schemas/RegistrationStatus'
+        registeredAt:
+          type: string
+          format: date-time
+          readOnly: true
+        cancelledAt:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        version:
+          type: integer
+          format: int64
+          description: Optimistic Locking Version
+          readOnly: true
+
+    WaitlistRegistration:
+      type: object
+      required:
+        - registrationId
+        - executionId
+        - userId
+        - waitlistPosition
+        - addedToWaitlistAt
+      properties:
+        registrationId:
+          type: string
+          format: uuid
+          readOnly: true
+        executionId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        waitlistPosition:
+          type: integer
+          minimum: 1
+          description: Position auf der Warteliste (1 = erster)
+        addedToWaitlistAt:
+          type: string
+          format: date-time
+          readOnly: true
+
+    WaitlistPosition:
+      type: object
+      properties:
+        registrationId:
+          type: string
+          format: uuid
+        waitlistPosition:
+          type: integer
+          minimum: 1
+        totalWaitlistSize:
+          type: integer
+
+    CreateRegistrationRequest:
+      type: object
+      required: [executionId, userId]
+      properties:
+        executionId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+
+    RegistrationListResponse:
+      type: object
+      required: [data, pagination]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Registration'
+        pagination:
+          $ref: '#/components/schemas/PaginationInfo'
+
+    ParticipantListResponse:
+      type: object
+      required: [data, pagination]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Registration'
+        totalRegistered:
+          type: integer
+        totalWaitlisted:
+          type: integer
+        pagination:
+          $ref: '#/components/schemas/PaginationInfo'
+
+    User:
+      type: object
+      required: [userId, roles, createdAt]
+      properties:
+        userId:
+          type: string
+          format: uuid
+          readOnly: true
+        displayName:
+          type: string
+          maxLength: 200
+          description: Anzeigename (kein Logging von PII)
+        roles:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserRole'
+          description: Aktive Rollen des Benutzers (Multi-Rollen möglich)
+        locale:
+          type: string
+          example: "de"
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+      description: |
+        Hinweis: E-Mail-Adresse ist im OIDC-Token vorhanden, wird
+        aber niemals in Logs, Events oder API-Antworten zurückgegeben (PII-Schutz).
+
+    UserListResponse:
+      type: object
+      required: [data, pagination]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+        pagination:
+          $ref: '#/components/schemas/PaginationInfo'
+
+    # ---------- Pagination ----------
+    PaginationInfo:
+      type: object
+      required: [limit]
+      properties:
+        nextCursor:
+          type: string
+          nullable: true
+          description: Cursor für die nächste Seite (null = letzte Seite)
+        limit:
+          type: integer
+
+    # ---------- Error (RFC 7807) ----------
+    ProblemDetail:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+          description: URI-Referenz des Fehlertyps
+        title:
+          type: string
+          description: Kurze, menschenlesbare Zusammenfassung
+        status:
+          type: integer
+          description: HTTP-Statuscode
+        detail:
+          type: string
+          description: Ausführliche Fehlerbeschreibung
+        instance:
+          type: string
+          format: uri
+          description: URI der betroffenen Ressource
+        errors:
+          type: array
+          description: Validierungsfehler (bei 400)
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+      example:
+        type: "https://eduplanner.skillbridge.ch/problems/validation-error"
+        title: "Validation Error"
+        status: 400
+        detail: "Eingabevalidierung fehlgeschlagen."
+        instance: "/api/v1/courses"
+        errors:
+          - field: "title"
+            message: "Darf nicht leer sein."
+
+# ============================================================
+#  Global Security (override per operation where needed)
+# ============================================================
+security:
+  - bearerAuth: []

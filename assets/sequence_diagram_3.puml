@@ -1,0 +1,69 @@
+@startuml CancellationSequenceDiagram
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam sequenceArrowColor #333333
+skinparam sequenceLifeLineBorderColor #333333
+skinparam sequenceLifeLineBackgroundColor #FFFFFF
+skinparam participantBackgroundColor #FFFFFF
+skinparam participantBorderColor #333333
+skinparam actorBackgroundColor #FFFFFF
+skinparam actorBorderColor #333333
+skinparam sequenceGroupBorderColor #999999
+skinparam sequenceGroupBackgroundColor #F5F5F5
+skinparam sequenceGroupBodyBackgroundColor #FAFAFA
+skinparam noteBorderColor #999999
+skinparam noteBackgroundColor #FFFFFF
+skinparam fontSize 11
+skinparam fontName Helvetica
+
+actor Teilnehmer as P
+participant "API Gateway" as GW
+participant "registration-Service" as RS
+participant "identity-Service" as IS
+participant "OutboxPublisher" as OP
+participant "Outbox-Relay" as OR
+participant "Message Broker" as MB
+participant "notification-Service" as NS
+
+P -> GW : DELETE /api/v1/registrations/{id} + JWT
+
+group Token-Validierung
+  GW -> GW : prüft Token-Signatur
+  alt Ungültiger Token
+    GW --> P : 401 Unauthorized
+  end
+end
+
+GW -> RS : Weiterleitung Request
+
+group Ownership-Prüfung
+  RS -> IS : prüfe Ownership (userId, registrationId)
+  alt Fremde Einschreibung
+    IS --> RS : 403 Forbidden
+    RS --> P : 403 Forbidden
+  end
+  IS --> RS : Ownership ✓
+end
+
+group Stornierung & Warteliste [DB-Transaktion]
+  RS -> RS : Status → CANCELLED\nKapazität inkrementieren
+  RS -> OP : schreibe RegistrationCancelled\nin outbox-Tabelle
+  alt Warteliste nicht leer
+    RS -> RS : ältesten WaitlistEntry nachrücken
+    RS -> OP : schreibe WaitlistParticipantPromoted\n+ ParticipantRegistered in outbox-Tabelle
+  end
+  OP --> RS : ✓
+end
+
+RS --> P : 204 No Content
+
+note over OR, MB : asynchron
+OR -> MB : publiziere Events
+MB -> NS : RegistrationCancelled
+NS --> P : Stornierungs-Bestätigungsmail
+alt Warteliste nicht leer
+  MB -> NS : WaitlistParticipantPromoted\n+ ParticipantRegistered
+  NS --> P : Nachrück-Benachrichtigung\nan Wartelisten-Teilnehmer
+end
+
+@enduml

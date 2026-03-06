@@ -1,0 +1,69 @@
+\section{Betrieb und Deployment -- Runbook}
+
+\begin{hinweis}[Erweiterung des arc42-Templates]
+Dieses Kapitel ist \emph{keine} Bestandteil des offiziellen arc42-Templates~v9,
+das mit Kapitel~12 (Glossar) endet. Es ergänzt die Architekturdokumentation um
+operative Aspekte, die für den produktiven Betrieb von EduPlanner notwendig sind.
+In einem realen Projekt würde dieses Runbook typischerweise als eigenständiges
+Dokument (z.\,B.\ im Team-Wiki) gepflegt und laufend aktualisiert.
+\end{hinweis}
+
+Dieses Kapitel dient als operatives Nachschlagewerk für den laufenden Betrieb von EduPlanner. Es beschreibt verbindliche Checklisten vor jedem Deployment, definiert Reaktionszeiten und Eskalationsstufen für Incidents sowie die regelmässig anfallenden Wartungsarbeiten. Das Runbook richtet sich an das Entwicklungs- und Betriebsteam und ist bei jeder Änderung am Deploymentprozess aktuell zu halten.
+
+\subsection{Pre-Deployment Checklist}
+
+Vor jedem produktiven Deployment ist die nachfolgende Checkliste vollständig abzuarbeiten. Kein Deployment darf ohne grüne CI-Pipeline und dokumentierten Rollback-Plan erfolgen. Bei Breaking Changes gegenüber bestehenden API-Konsumenten ist zusätzlich die frühzeitige Stakeholder-Kommunikation obligatorisch.
+
+\begin{tabularx}{\textwidth}{C{0.6cm} X}
+  \rowcolor{tableheader}
+  \color{white}\textbf{\#} & \color{white}\textbf{Prüfpunkt} \\
+  1 & Code Review abgeschlossen (min.\ 1~Approval) \\
+  \rowcolor{tablegrey}
+  2 & Alle Unit- und Integrationstests grün (CI~Pipeline) \\
+  3 & Security Scan erfolgreich (Trivy: keine Critical/High) \\
+  \rowcolor{tablegrey}
+  4 & Schema-Migration in Staging getestet (Flyway dryrun) \\
+  5 & OpenAPI-Spezifikation aktualisiert (falls API-Änderung) \\
+  \rowcolor{tablegrey}
+  6 & Pact Contract Tests grün (ab Sprint~8) \\
+  7 & Docker Image mit Immutable Tag (Git SHA) \\
+  \rowcolor{tablegrey}
+  8 & Release Notes erstellt \\
+  9 & Rollback-Plan dokumentiert \\
+  \rowcolor{tablegrey}
+  10 & Stakeholder informiert (bei Breaking Changes) \\
+\end{tabularx}
+
+\subsection{Incident Response}
+
+Tritt ein Störfall auf, wird dieser anhand der nachfolgenden Severity-Stufen klassifiziert. Die Einstufung bestimmt die maximale Reaktionszeit sowie den Eskalationspfad. SEV-1- und SEV-2-Incidents sind umgehend im internen Kommunikationskanal zu melden; für SEV-1 gilt zusätzlich die sofortige Benachrichtigung der Projektleitung. Nach jedem SEV-1- oder SEV-2-Incident ist ein Post-Mortem-Bericht innerhalb von 48~Stunden zu erstellen.
+
+\begin{tabularx}{\textwidth}{C{1.5cm} L{3.5cm} C{2.2cm} X}
+  \rowcolor{tableheader}
+  \color{white}\textbf{Severity} & \color{white}\textbf{Beschreibung} & \color{white}\textbf{Reaktionszeit} & \color{white}\textbf{Beispiele} \\
+  SEV-1 & System nicht verfügbar & 15~min & Komplettausfall; Datenverlust; Sicherheitsvorfall \\
+  \rowcolor{tablegrey}
+  SEV-2 & Kernfunktion eingeschränkt & 1~h & Einschreibungen nicht möglich \\
+  SEV-3 & Nicht-kritische Funktion & 4~h & E-Mail-Versand verzögert \\
+  \rowcolor{tablegrey}
+  SEV-4 & Kosmetisch / Minor & Nächster Sprint & UI-Darstellungsfehler \\
+\end{tabularx}
+
+\subsection{Routine-Wartungsarbeiten}
+
+Neben dem reaktiven Incident-Management sind folgende Wartungsarbeiten proaktiv und nach festgelegtem Rhythmus durchzuführen. Sie dienen der langfristigen Systemstabilität, der Datensicherheit und der Kostenkontrolle. Die Verantwortung für die termingerechte Durchführung liegt beim jeweils zuständigen Teammitglied; die Ergebnisse sind im internen Betriebslog zu dokumentieren.
+
+\begin{tabularx}{\textwidth}{L{3.5cm} L{2.5cm} X}
+  \rowcolor{tableheader}
+  \color{white}\textbf{Aufgabe} & \color{white}\textbf{Frequenz} & \color{white}\textbf{Beschreibung} \\
+  DB-Backup-Validierung & Wöchentlich & Auto-Restore in Testing; Datenintegrität validieren \\
+  \rowcolor{tablegrey}
+  Dependency Updates & 2-wöchentlich & Dependabot PRs; Security Patches priorisieren \\
+  Certificate Renewal & Monatlich prüfen & Let's Encrypt autorenew; 30~Tage vor Ablauf prüfen \\
+  \rowcolor{tablegrey}
+  Capacity Review & Monatlich & Cloud-Kosten; Reserved Instances evaluieren \\
+  Security Scan & Wöchentlich & Trivy, Snyk \\
+  \rowcolor{tablegrey}
+  Chaos Engineering & Wöchentlich & Pod-Kills, Network-Delays in Staging \\
+  DR-Systemtest & Halbjährlich & Vollständiger Failover-Test; Verantwortung: Patrick Hari \\
+\end{tabularx}

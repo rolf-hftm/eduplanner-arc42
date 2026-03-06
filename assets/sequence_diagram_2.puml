@@ -1,0 +1,61 @@
+@startuml WaitlistSequenceDiagram
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam sequenceArrowColor #333333
+skinparam sequenceLifeLineBorderColor #333333
+skinparam sequenceLifeLineBackgroundColor #FFFFFF
+skinparam participantBackgroundColor #FFFFFF
+skinparam participantBorderColor #333333
+skinparam actorBackgroundColor #FFFFFF
+skinparam actorBorderColor #333333
+skinparam sequenceGroupBorderColor #999999
+skinparam sequenceGroupBackgroundColor #F5F5F5
+skinparam sequenceGroupBodyBackgroundColor #FAFAFA
+skinparam noteBorderColor #999999
+skinparam noteBackgroundColor #FFFFFF
+skinparam fontSize 11
+skinparam fontName Helvetica
+
+actor Teilnehmer as P
+participant "API Gateway" as GW
+participant "registration-Service" as RS
+participant "identity-Service" as IS
+participant "CapacityChecker" as CC
+participant "OutboxPublisher" as OP
+participant "Outbox-Relay" as OR
+participant "Message Broker" as MB
+participant "notification-Service" as NS
+
+P -> GW : POST /api/v1/registrations\n{executionId, userId} + JWT
+
+group Token-Validierung
+  GW -> GW : prüft Token-Signatur
+  alt Ungültiger Token
+    GW --> P : 401 Unauthorized
+  end
+end
+
+GW -> RS : Weiterleitung Request
+
+group Rollenverifikation
+  RS -> IS : prüfe Rolle (userId)
+  IS --> RS : PARTICIPANT / STAFF / ADMIN ✓
+end
+
+group Kapazitätsprüfung & Warteliste [DB-Transaktion]
+  RS -> CC : lese Kapazität\n(Optimistic Locking)
+  CC --> RS : Kapazität = 0 ✗
+  RS -> RS : WaitlistEntry persistieren\n(Zeitstempel + Position)
+  RS -> OP : schreibe ParticipantAddedToWaitlist\n(mit Position) in outbox-Tabelle
+  OP --> RS : ✓
+end
+
+RS --> P : 202 Accepted\n{waitlistPosition}
+
+note over OR, MB : asynchron
+OR -> MB : publiziere ParticipantAddedToWaitlist
+MB -> NS : ParticipantAddedToWaitlist Event
+NS -> NS : rendere E-Mail
+NS --> P : Wartelisten-Bestätigungsmail
+
+@enduml

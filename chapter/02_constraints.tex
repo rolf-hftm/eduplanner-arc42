@@ -1,0 +1,170 @@
+\section{Randbedingungen}
+\label{sec:randbedingungen}
+
+Randbedingungen (\emph{Constraints}) schränken den Lösungsraum ein.
+Im Gegensatz zu Architekturentscheidungen, die das Team bewusst trifft
+und in ADRs\footnotemark{} festhält, sind Randbedingungen
+\emph{vorgegeben} -- etwa durch den Auftraggeber, die Organisation
+oder das regulatorische Umfeld -- und können vom Architekturteam
+nicht einseitig geändert werden.
+
+\begin{hinweis}[Historischer Entscheidungsstand]
+Einige technische Randbedingungen beschreiben den \emph{initialen}
+Entscheidungsraum, bevor konkrete Architekturentscheidungen (ADRs)
+getroffen wurden. Wo ADRs existieren, die eine offene Option
+konkretisieren (z.\,B.\ Cloud-Provider, Frontend-Framework,
+Message Broker), wird dies im jeweiligen Eintrag vermerkt.
+Die verbindliche Entscheidung liegt stets im zugehörigen ADR
+(Kap.~9).
+\end{hinweis}
+
+\footnotetext{%
+  \textbf{ADR -- Architecture Decision Record.}
+  Ein ADR ist ein kurzes, strukturiertes Dokument, das eine einzelne,
+  architekturrelevante Entscheidung samt Kontext, betrachteten
+  Alternativen und Begründung festhält. Das Format geht auf
+  Michael Nygard zurück
+  (\url{https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions}).%
+}
+
+% ──────────────────────────────────────────────
+\subsection{Technische Randbedingungen}
+\label{sec:randbedingungen-technisch}
+
+\begin{tabularx}{\textwidth}{L{3.2cm} X}
+  \rowcolor{tableheader}
+  \color{white}\textbf{Randbedingung} &
+  \color{white}\textbf{Hintergrund / Erläuterung} \\
+
+  Webtechnologie &
+  Browserbasierter Zugriff ohne lokale Installation;
+  Unterstützung mobiler Browser ist erforderlich. \\
+
+  \rowcolor{tablegrey}
+  Cloud-Deployment &
+  Public Cloud; kein On-Premise-Betrieb.
+  \textit{Historischer Stand zum Entscheidungszeitpunkt: Azure oder AWS präferiert.}
+  Die finale Provider-Wahl ist in ADR-010 dokumentiert:
+  Microsoft Azure, Region Switzerland~North (Zürich). \\
+
+  REST / JSON &
+  Alle Backend-Dienste stellen RESTful-HTTP-APIs bereit.
+  GraphQL ist für eine spätere Ausbaustufe vorgesehen
+  (vgl.\ Kap.~14.3). \\
+
+  \rowcolor{tablegrey}
+  Containerisierung &
+  Docker-Container, orchestriert via Kubernetes
+  (K8s~1.28+). \\
+
+  HTTPS / TLS &
+  Sämtliche Client-Server-Kommunikation erfolgt über HTTPS
+  mit TLS~1.3. \\
+
+  \rowcolor{tablegrey}
+  Datenbank / Messaging &
+  PostgreSQL~15 für transaktionale Daten;
+  RabbitMQ als Message Broker (Azure Service Bus als evaluierte Alternative --
+  zurückgestellt, vgl.\ ADR-002). \\
+
+  Authentifizierung &
+  OAuth~2.0 / OpenID Connect über einen externen Identity
+  Provider (z.\,B.\ Keycloak). Kein proprietäres
+  Auth-System. \\
+
+  \rowcolor{tablegrey}
+  Programmiersprachen &
+  Backend: Java~21 (Spring Boot~3) oder Kotlin.\newline
+  Frontend: TypeScript mit Angular (entschieden, vgl.\ ADR-005;
+  Vue.js als gleichwertige Alternative evaluiert und zurückgestellt). \\
+\end{tabularx}
+
+% ──────────────────────────────────────────────
+\subsection{Organisatorische Randbedingungen}
+\label{sec:randbedingungen-organisatorisch}
+
+\begin{tabularx}{\textwidth}{L{3.2cm} X}
+  \rowcolor{tableheader}
+  \color{white}\textbf{Randbedingung} &
+  \color{white}\textbf{Hintergrund / Erläuterung} \\
+
+  Teamgrösse &
+  Cross-funktionales Team von 5--8~Personen
+  (inkl.\ QA-Engineering). \\
+
+  \rowcolor{tablegrey}
+  Entwicklungsprozess &
+  Scrum mit 2-Wochen-Sprints. Die Definition of Done
+  schliesst Unit- und Integrationstests ein. \\
+
+  Zeitrahmen &
+  MVP innerhalb von 6~Monaten; vollständiger Rollout
+  nach 12~Monaten. \\
+
+  \rowcolor{tablegrey}
+  Budget (Cloud-Betrieb) &
+  Cloud-Betriebskosten $\leq$~CHF\,800\,/\,Monat.
+  Ein Puffer von 10\,\% (CHF\,80) wird empfohlen
+  (vgl.\ Kap.~11, R12). \\
+
+  Open Source &
+  Bevorzugte Nutzung von Komponenten unter Apache-2.0-
+  oder MIT-Lizenz. \\
+
+ \rowcolor{tablegrey}
+  Source Control &
+  Git (GitHub). Trunk-Based Development\footnotemark{} mit
+  kurzlebigen Feature-Branches und verpflichtenden
+  Pull-Request-Reviews. \\
+\end{tabularx}
+
+\footnotetext{%
+  \textbf{Trunk-Based Development} bezeichnet ein
+  Versionsverwaltungsmodell, bei dem es nur einen einzigen
+  Hauptzweig (\texttt{main}) gibt, der jederzeit auslieferbar
+  sein muss. Änderungen entstehen auf kurzlebigen Arbeitszweigen
+  (\emph{Feature-Branches}, Lebensdauer 1--3~Tage) und werden
+  über sogenannte \emph{Pull Requests} zurückgeführt: Mindestens
+  ein weiteres Teammitglied prüft dabei den Code auf Korrektheit
+  und Einhaltung der Projektstandards (\emph{Code Review}).
+  Die Zusammenführung erfolgt erst nach erfolgreicher Prüfung
+  und bestandener automatisierter Testpipeline.%
+}
+
+
+% ──────────────────────────────────────────────
+\subsection{Rechtliche und regulatorische Randbedingungen}
+\label{sec:randbedingungen-recht}
+
+\begin{tabularx}{\textwidth}{L{3.2cm} X}
+  \rowcolor{tableheader}
+  \color{white}\textbf{Randbedingung} &
+  \color{white}\textbf{Hintergrund} \\
+
+  DSGVO / revDSG &
+  Personenbezogene Daten unterliegen der EU-DSGVO sowie
+  dem Schweizer revDSG. Datenspeicherung erfolgt
+  ausschliesslich in der EU bzw.\ der Schweiz. \\
+
+  \rowcolor{tablegrey}
+  Datensparsamkeit &
+  Es werden nur die für den Kernbetrieb notwendigen
+  Personendaten erhoben (Grundsatz der
+  Datenminimierung). \\
+
+  Recht auf Löschung &
+  Personendaten müssen auf Anfrage innerhalb von
+  30~Tagen gelöscht oder anonymisiert werden
+  (Art.~17 DSGVO; Art.~32 revDSG). \\
+
+  \rowcolor{tablegrey}
+  Auftragsverarbeitung &
+  Sämtliche Cloud-Provider und externen Dienstleister
+  sind über einen Auftragsverarbeitungsvertrag (AVV)
+  nach Art.~28 DSGVO zu binden. \\
+
+  Protokollierung &
+  Sicherheitsrelevante Aktionen müssen auditierbar
+  protokolliert werden. Aufbewahrungsfrist: mindestens
+  3~Jahre. \\
+\end{tabularx}

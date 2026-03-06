@@ -1,0 +1,37 @@
+@startuml CatalogClassDiagram
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam classBackgroundColor #E8F4F8
+skinparam classBorderColor #333333
+skinparam classArrowColor #333333
+skinparam linetype ortho
+skinparam fontSize 11
+skinparam fontName Helvetica
+
+package "catalog Service" {
+  class CatalogController
+  class CatalogService
+  class Course <<AggregateRoot>>
+  class CourseStatus <<ValueObject>>
+  class TrainerProfile
+  interface CourseRepository <<Port>>
+  class CourseRepositoryJPA
+  class OutboxPublisher
+  class CourseCreated <<Event>>
+  class CoursePublished <<Event>>
+  class CourseArchived <<Event>>
+
+  CatalogController --> CatalogService
+  CatalogService --> CourseRepository
+  CatalogService --> OutboxPublisher
+  CatalogService --> Course
+  Course --> CourseStatus
+  Course --> TrainerProfile
+  CourseRepository --> Course
+  CourseRepositoryJPA ..|> CourseRepository
+  OutboxPublisher --> CourseCreated
+  OutboxPublisher --> CoursePublished
+  OutboxPublisher --> CourseArchived
+}
+
+@enduml

@@ -1,0 +1,126 @@
+% ============================================================
+% ANHANG C – Literaturverzeichnis
+% ============================================================
+
+\section{Anhang~C: Literaturverzeichnis}
+\label{sec:literaturverzeichnis}
+
+\begin{hinweis}[Lehrhinweis]
+  Dieses Literaturverzeichnis enthält alle Quellen, auf die im Dokument explizit
+  verwiesen wird, sowie empfohlene Standardwerke für die im Modul behandelten
+  Themen.
+\end{hinweis}
+
+% ── Architektur & arc42 ─────────────────────────────────────
+\subsection*{Architektur \& arc42}
+
+\begin{description}[leftmargin=2em, style=nextline]
+  \item[Starke, G. (2024)]
+  \textit{Effektive Softwarearchitekturen -- Ein praktischer Leitfaden.}\\
+  Carl Hanser Verlag, 10.~Aufl., 2024. 369~S.,
+  ISBN~978-3-446-47672-1.\\
+  \textbf{Relevant: gesamtes Dokument.}
+
+  \item[arc42.org (2025)]
+  \textit{arc42 Template v9 (Juli 2025).}\\
+  \url{https://arc42.org} -- Offizielle Template-Quelle.
+
+  \item[Brown, S. (2018)]
+  \textit{The C4 Model for Software Architecture.}\\
+  \url{https://c4model.com} -- Grundlage der Diagrammnotation in Kap.~3, 5, 7.
+\end{description}
+
+% ── Domain-Driven Design ────────────────────────────────────
+\subsection*{Domain-Driven Design}
+
+\begin{description}[leftmargin=2em, style=nextline]
+  \item[Evans, E. (2003)]
+  \textit{Domain-Driven Design: Tackling Complexity in the Heart of Software.}\\
+  Addison-Wesley. -- Grundlage für Bounded Contexts, Aggregates, Ubiquitous Language.
+  \textbf{Relevant: Kap.~4, ADR-001.}
+
+  \item[Vernon, V. (2013)]
+  \textit{Implementing Domain-Driven Design.}\\
+  Addison-Wesley. -- Praxishandbuch zu DDD-Mustern inkl.\ Context Maps und Aggregates.
+  \textbf{Relevant: Kap.~4.2, 5.}
+
+  \item[Brandolini, A. (2021)]
+  \textit{Introducing EventStorming.}\\
+  Leanpub. \url{https://www.eventstorming.com} --
+  Methode zur kollaborativen Domänenentdeckung. \textbf{Relevant: Kap.~4.2, Anhang~A.}
+\end{description}
+
+% ── Microservices ───────────────────────────────────────────
+\subsection*{Microservices}
+
+\begin{description}[leftmargin=2em, style=nextline]
+  \item[Newman, S. (2021)]
+  \textit{Building Microservices: Designing Fine-Grained Systems.} 2.~Aufl.\\
+  O'Reilly. -- Standardwerk zu Microservice-Architektur und Service-Kommunikation.
+  \textbf{Relevant: Kap.~4.1 (Fussnote), ADR-001, ADR-002.}
+
+  \item[Richardson, C. (2018)]
+  \textit{Microservices Patterns: With Examples in Java.}\\
+  Manning. \url{https://microservices.io} --
+  Transactional Outbox Pattern, Saga, CQRS.
+  \textbf{Relevant: ADR-004, ADR-009, Kap.~5.4.}
+\end{description}
+
+% ── Software-Qualität ───────────────────────────────────────
+\subsection*{Software-Qualität}
+
+\begin{description}[leftmargin=2em, style=nextline]
+  \item[ISO/IEC 25010:2011]
+  \textit{Systems and software engineering -- Systems and software Quality Requirements
+  and Evaluation (SQuaRE) -- System and software quality models.}\\
+  International Organization for Standardization. --
+  Qualitätsmodell mit 8 Hauptmerkmalen.
+  \textbf{Relevant: Kap.~1.2, 4.4, 10.}
+
+  \item[Bass, L. / Clements, P. / Kazman, R. (2021)]
+  \textit{Software Architecture in Practice.} 4.~Aufl.\\
+  Addison-Wesley. -- Qualitätsszenarien und ATAM-Methode.
+  \textbf{Relevant: Kap.~10, ATAM-light.}
+\end{description}
+
+% ── Sicherheit & Protokolle ─────────────────────────────────
+\subsection*{Sicherheit \& Protokolle}
+
+\begin{description}[leftmargin=2em, style=nextline]
+  \item[IETF RFC 6749 (2012)]
+  \textit{The OAuth 2.0 Authorization Framework.}\\
+  \url{https://datatracker.ietf.org/doc/html/rfc6749} --
+  Grundlage des Autorisierungskonzepts. \textbf{Relevant: ADR-003, Kap.~8.1.}
+
+  \item[OpenID Foundation (2014)]
+  \textit{OpenID Connect Core 1.0.}\\
+  \url{https://openid.net/specs/openid-connect-core-1_0.html} --
+  OIDC-Protokoll für Authentifizierung via externem IdP.
+  \textbf{Relevant: ADR-003, Kap.~8.1.}
+
+  \item[OWASP Foundation (2021)]
+  \textit{OWASP Top 10 -- 2021.}\\
+  \url{https://owasp.org/Top10/} --
+  Sicherheits-Checkliste für den Security-Audit vor Go-Live.
+  \textbf{Relevant: Kap.~1.1 (Go-Live-Kriterien v1.0), Q5, Q7.}
+\end{description}
+
+% ── Patterns & Tools ────────────────────────────────────────
+\subsection*{Patterns \& Tools}
+
+\begin{description}[leftmargin=2em, style=nextline]
+  \item[Nygard, M. (2011)]
+  \textit{Documenting Architecture Decisions.}\\
+  \url{https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions} --
+  Ursprüngliches ADR-Format. \textbf{Relevant: Kap.~2 (Fussnote), Kap.~9.}
+
+  \item[Fowler, M. (2018)]
+  \textit{Strangler Fig Application.}\\
+  \url{https://martinfowler.com/bliki/StranglerFigApplication.html} --
+  Migrationsmuster; relevant für v2.0 Multi-Tenancy (Kap.~14.3).
+
+  \item[Fowler, M. / Foemmel, M. (2006)]
+  \textit{Continuous Integration.}\\
+  \url{https://martinfowler.com/articles/continuousIntegration.html} --
+  Grundlage der CI/CD-Strategie (Kap.~7.3).
+\end{description}

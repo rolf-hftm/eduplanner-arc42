@@ -1,0 +1,67 @@
+\section{Roadmap und Evolution}
+
+\begin{hinweis}[Erweiterung des arc42-Templates]
+Auch dieses Kapitel ist \emph{kein} Bestandteil des offiziellen arc42-Templates~v9.
+Zukunftspläne und technische Weiterentwicklung sind im arc42-Standard unter
+Kapitel~11 (Risiken und technische Schulden) angesiedelt. Eine dedizierte Roadmap
+geht darüber hinaus und ist hier als Lehrbeispiel für die Planung von
+Architekturevolution dokumentiert. In der Praxis lebt ein solches Dokument
+typischerweise als Product-Roadmap im Projektmanagement-Tool (z.\,B.\ Jira, Linear).
+\end{hinweis}
+
+Dieses Kapitel beschreibt die geplante Entwicklung von EduPlanner über die kommenden Versionen. Die Roadmap orientiert sich an den identifizierten technischen Schulden (Kap.~11), den Qualitätszielen (Kap.~10) sowie den geschäftlichen Anforderungen. Die Umsetzung beginnt im April~2026; alle Zeitangaben sind als Planungsziele zu verstehen und werden im Rahmen des regulären Sprint-Reviews angepasst.
+
+\subsection{Versionsübersicht}
+
+Die folgende Tabelle gibt einen kompakten Überblick über alle geplanten Versionen und ihre zentralen Meilensteine. Die Versionen bauen aufeinander auf: Das MVP legt die technische Basis, v1.0 konsolidiert und stabilisiert, v1.1 tilgt priorisierte technische Schulden, und v2.0 transformiert EduPlanner zu einer mandantenfähigen SaaS-Plattform.
+
+\begin{tabularx}{\textwidth}{L{2.5cm} C{2.5cm} X}
+  \rowcolor{tableheader}
+  \color{white}\textbf{Version} & \color{white}\textbf{Zeitraum} & \color{white}\textbf{Meilenstein} \\
+  MVP (v0.1--v0.9) & Q2 2026 & Kernfunktionen: Katalog, Einschreibung, E-Mail, RBAC \\
+  \rowcolor{tablegrey}
+  v1.0 & Q3 2026 & Vollständiger Release: API-Doku, Performance-Tests, Security-Audit \\
+  v1.1 & Q4 2026 & Polish: Contract Tests, Template-UI, Accessibility, Rate-Limiting \\
+  \rowcolor{tablegrey}
+  v2.0 & Q1--Q2 2027 & SaaS / Multi-Tenancy: Schema-per-Tenant, Service Mesh, Payment \\
+\end{tabularx}
+
+\subsection{v1.1 -- Polish und Stabilität (Q4 2026)}
+
+Version~1.1 fokussiert sich auf die Tilgung der höchstpriorisierten technischen Schulden aus Kap.~11 sowie auf eine verbesserte Nutzererfahrung. Die in dieser Phase umgesetzten Massnahmen sind Voraussetzung für den stabilen Betrieb und bilden die Basis für die umfangreichen Erweiterungen in v2.0. Alle Punkte sind bereits in der Backlog-Priorisierung berücksichtigt.
+
+\begin{tabularx}{\textwidth}{C{0.8cm} L{4cm} X}
+  \rowcolor{tableheader}
+  \color{white}\textbf{\#} & \color{white}\textbf{Feature / Tilgung} & \color{white}\textbf{Details} \\
+  TS2 & Contract Testing & Pact-Tests für alle Service-Schnittstellen \\
+  \rowcolor{tablegrey}
+  TS3 & Template-Management-UI & E-Mail-Templates über Admin-UI konfigurierbar \\
+  TS6 & Accessibility & axe-core in Cypress; WCAG~2.1~AA \\
+  \rowcolor{tablegrey}
+  TS7 & Differenziertes Rate-Limiting & Unterschiedliche Limits pro Rolle \\
+  -- & iCal-Export & Durchführungstermine als iCal-Feed \\
+\end{tabularx}
+
+\subsection{v2.0 -- Multi-Tenancy und SaaS (Q1--Q2 2027)}
+
+Version~2.0 stellt den grössten Evolutionsschritt von EduPlanner dar: Die Plattform wird von einer Single-Tenant-Applikation zu einer vollwertigen SaaS-Lösung mit Mandantenfähigkeit weiterentwickelt. Diese Phase erfordert tiefgreifende Änderungen an Datenbankschicht, Authentifizierung und Infrastruktur. R11 (Datenmigration, Kap.~11.1) ist das grösste Risiko dieser Phase und wird durch das Expand-Contract-Pattern sowie zwingende Staging-Tests mitigiert.
+
+\begin{korrektur}[Architekturhinweis v2.0]
+  v2.0 erfordert signifikante Änderungen an der Datenbankschicht (ADR-008~Tilgung) und der Authentifizierung.
+  R11 (Datenmigration) ist das grösste Risiko dieser Phase.
+\end{korrektur}
+
+\begin{tabularx}{\textwidth}{L{3.5cm} X}
+  \rowcolor{tableheader}
+  \color{white}\textbf{Feature} & \color{white}\textbf{Beschreibung} \\
+  Multi-Tenancy & Schema-per-Tenant; \texttt{tenant\_id} in allen Tabellen; Tenant-Routing; separates IdP-Realm. (Tilgung TS4, ADR-008) \\
+  \rowcolor{tablegrey}
+  Service Mesh & Linkerd für mTLS, L7-Observability, auto.\ Retry. (Tilgung TS1, ADR-007) \\
+  Payment Gateway & Stripe-Integration; Rechnungsstellung; Gutschein-System. \\
+  \rowcolor{tablegrey}
+  Mobile App & React~Native für iOS/Android; Push-Notifications. \\
+  Advanced Analytics & Data Warehouse; BI-Dashboard; ML-Kursempfehlungen. \\
+  \rowcolor{tablegrey}
+  LMS-Integration & API-Schnittstellen zu Moodle, Canvas. \\
+  GraphQL API & Optionale GraphQL-Schicht neben REST. \\
+\end{tabularx}

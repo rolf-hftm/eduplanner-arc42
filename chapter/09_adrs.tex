@@ -1,0 +1,288 @@
+\section{Architekturentscheidungen (ADRs)}
+
+Architecture Decision Records (ADRs)\footnote{%
+  \textit{Architecture Decision Record (ADR)}: Ein ADR ist ein kurzes, strukturiertes Dokument,
+  das eine einzelne, architekturrelevante Entscheidung samt Kontext, betrachteten Alternativen
+  und Begründung festhält. Das Format geht auf Michael Nygard zurück
+  (\url{https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions}).}
+dokumentieren wichtige Architekturentscheidungen mit Kontext, Alternativen und Konsequenzen.
+Jeder ADR ist unveränderlich – er wird nicht überschrieben, sondern durch einen neuen ADR
+abgelöst oder ergänzt. Die nachfolgenden ADRs decken alle in diesem Dokument referenzierten
+Entscheidungen vollständig ab.
+
+% ── ADR-001 ──────────────────────────────────────────────────
+\subsection{ADR-001: Microservices entlang der Bounded Contexts}
+
+\begin{tabularx}{\textwidth}{L{3.5cm} X}
+  \rowcolor{tableheader}
+  \color{white}\textbf{Feld} & \color{white}\textbf{Inhalt} \\
+  Status & Akzeptiert -- 2026-01-20 \\
+  \rowcolor{tablegrey}
+  Qualitätsziele & Maintainability (primär), Reliability-Availability, Performance Efficiency \\
+  Entscheidungstreiber & Unabhängige Deploybarkeit der Teams; unterschiedliche Skalierungsbedarfe je BC; langfristige Wartbarkeit durch klare fachliche Grenzen (DDD). \\
+  \rowcolor{tablegrey}
+  Kontext & 5~klar abgrenzbare fachliche Domänen mit unterschiedlichen Änderungsraten, Skalierungsbedarfen und Team-Verantwortlichkeiten. \\
+  Entscheidung & Jeder Bounded Context als eigenständiger Microservice mit eigenem Repository und eigener Datenbank. \\
+  \rowcolor{tablegrey}
+  Alternativen & (1)~\emph{Modularer Monolith} -- ernsthaft evaluiert:
+  geringere Betriebskomplexität, einfachere lokale Entwicklung,
+  ACID-Transaktionen über Modulgrenzen. Für ein 5--8-köpfiges Team und
+  einen 6-Monats-MVP ist dies die objektiv einfachere Wahl.
+  Abgelehnt wegen (a)~unterschiedlicher Skalierungsbedarfe:
+  \texttt{registration} muss zur Spitzenzeit unabhängig skalieren;
+  (b)~Erfahrung zeigt, dass Modulgrenzen im Monolithen mit der Zeit
+  erodieren (``Big Ball of Mud''); (c)~Lernziel: Microservices
+  realitätsnah dokumentieren.
+  Fallback explizit geplant: falls Betriebsaufwand das Team überfordert,
+  Rückbau auf modularen Monolithen (Risiko~R5).
+  (2)~Zwei Services -- abgelehnt: fachliche Grenzen verwischen. \\
+  Konsequenzen & (+)~Unabhängige Deployments. (+)~Team-Autonomie. (+)~Separate Skalierbarkeit. (-)~Erhöhte Betriebskomplexität. (-)~Eventual Consistency. \\
+\end{tabularx}
+
+% ── ADR-002 ──────────────────────────────────────────────────
+\subsection{ADR-002: Asynchrone Kommunikation via Message Broker}
+
+\begin{tabularx}{\textwidth}{L{3.5cm} X}
+  \rowcolor{tableheader}
+  \color{white}\textbf{Feld} & \color{white}\textbf{Inhalt} \\
+  Status & Akzeptiert -- 2026-01-22 \\
+  \rowcolor{tablegrey}
+  Qualitätsziele & Reliability-Availability (primär), Maintainability, Functional Correctness \\
+  Entscheidungstreiber & Resilienz bei Teilausfällen; Entkopplung von Sender und Empfänger; kein Kaskadenausfall durch synchrone Abhängigkeiten. \\
+  \rowcolor{tablegrey}
+  Entscheidung & Domain Events über RabbitMQ (Pub/Sub). \\
+  Alternativen & (1)~Direkter REST-Aufruf -- abgelehnt: starke Kopplung, Kaskadenfehler. (2)~Polling der DB -- abgelehnt: ineffizient. (3)~Kafka -- zurückgestellt: Overkill für aktuelles Volumen. \\
+  \rowcolor{tablegrey}
+  Konsequenzen & (+)~Lose Kopplung. (+)~Resilienz. (-)~Eventual Consistency. (-)~Zusätzliche Infrastruktur. \\
+\end{tabularx}
+
+% ── ADR-003 ──────────────────────────────────────────────────
+\subsection{ADR-003: Externer Identity Provider}
+
+\begin{tabularx}{\textwidth}{L{3.5cm} X}
+  \rowcolor{tableheader}
+  \color{white}\textbf{Feld} & \color{white}\textbf{Inhalt} \\
+  Status & Akzeptiert -- 2026-01-25 \\
+  \rowcolor{tablegrey}
+  Qualitätsziele & Security (primär), Maintainability \\
+  Entscheidungstreiber & Kein eigenes Passwort-Management (Sicherheitsrisiko); MFA und SSO ohne Eigenentwicklung; DSGVO-konforme Datenhaltung beim IdP. \\
+  \rowcolor{tablegrey}
+  Entscheidung & Externer OIDC-konformer IdP (z.\,B.\ Keycloak). EduPlanner verwaltet keine Passwörter. \\
+  Alternativen & (1)~Eigener Auth-Service -- abgelehnt: hohes Sicherheitsrisiko. (2)~Auth0/Okta -- in Evaluierung für v2.0. \\
+  \rowcolor{tablegrey}
+  Konsequenzen & (+)~Security-Best-Practices, MFA, SSO, DSGVO. (-)~Externe Abhängigkeit (R3). \\
+\end{tabularx}
+
+% ── ADR-004 ──────────────────────────────────────────────────
+\subsection{ADR-004: Transactional Outbox für zuverlässige Events}
+
+\begin{tabularx}{\textwidth}{L{3.5cm} X}
+  \rowcolor{tableheader}
+  \color{white}\textbf{Feld} & \color{white}\textbf{Inhalt} \\
+  Status & Akzeptiert -- 2026-02-01 \\
+  \rowcolor{tablegrey}
+  Qualitätsziele & Functional Correctness (primär), Reliability-Availability \\
+  Entscheidungstreiber & Atomizität zwischen DB-Schreibvorgang und Event-Publikation; Vermeidung von Dual-Write-Problem; Garantie: kein verlorenes Event. \\
+  \rowcolor{tablegrey}
+  Entscheidung & Events atomar mit DB-Änderung in \texttt{outbox}-Tabelle; Relay-Prozess publiziert asynchron (Technologie: ADR-009). \\
+  Alternativen & (1)~Dual Write -- abgelehnt: kein Two-Phase-Commit. (2)~Event-Sourcing -- zu komplex. \\
+  \rowcolor{tablegrey}
+  Konsequenzen & (+)~Keine verlorenen Events. (+)~Atomare Konsistenz. (-)~Idempotente Handler erforderlich. \\
+\end{tabularx}
+
+% ── ADR-005 ──────────────────────────────────────────────────
+\subsection{ADR-005: Angular SPA als Frontend-Technologie}
+
+\begin{tabularx}{\textwidth}{L{3.5cm} X}
+  \rowcolor{tableheader}
+  \color{white}\textbf{Feld} & \color{white}\textbf{Inhalt} \\
+  Status & Akzeptiert -- 2026-02-05 \\
+  \rowcolor{tablegrey}
+  Qualitätsziele & Usability (primär), Maintainability \\
+  Entscheidungstreiber & Team-Kenntnisse in Vue.js und Angular vorhanden; SPA ermöglicht reaktive UX ohne Server-Round-Trip; TypeScript erhöht Wartbarkeit. \\
+  \rowcolor{tablegrey}
+  Entscheidung & Angular, TypeScript. \\
+  Alternativen & (1)~Next.js -- zurückgestellt (v2.0). (2)~Vue.js -- als gleichwertige Alternative evaluiert; Angular gewählt aufgrund stärkerer Typisierung und integriertem Framework-Ökosystem. \\
+  \rowcolor{tablegrey}
+  Konsequenzen & (+)~Bekanntes Ökosystem. (+)~Starke Typisierung via TypeScript. (-)~Bundle-Grösse (Code Splitting erforderlich). (-)~SEO-Aufwand (kein SSR in v1.0). \\
+\end{tabularx}
+
+% ── ADR-006 ──────────────────────────────────────────────────
+\subsection{ADR-006: PostgreSQL als primäre Datenbank}
+
+\begin{tabularx}{\textwidth}{L{3.5cm} X}
+  \rowcolor{tableheader}
+  \color{white}\textbf{Feld} & \color{white}\textbf{Inhalt} \\
+  Status & Akzeptiert -- 2026-02-08 \\
+  \rowcolor{tablegrey}
+  Qualitätsziele & Functional Correctness (primär), Reliability-Availability \\
+  Entscheidungstreiber & ACID-Garantien für Transaktionen; JSONB-Support\footnote{JSONB
+    (JSON Binary): speichert JSON-Daten binär dekomprimiert -- im Gegensatz zu JSON indizierbar
+    (GIN-Index) und deutlich schneller abfragbar.} für flexible Payloads;
+  Flyway-Kompatibilität; breite Java-Ökosystem-Unterstützung. \\
+  \rowcolor{tablegrey}
+  Entscheidung & PostgreSQL~15 (Managed) für alle Services. \\
+  Alternativen & (1)~MySQL -- abgelehnt (JSONB-Support, Lizenz). (2)~MongoDB -- abgelehnt (ACID-Transaktionen). \\
+  \rowcolor{tablegrey}
+  Konsequenzen & (+)~Starke Konsistenz. (+)~JSONB-Flexibilität. (-)~Skalierbarkeit nur vertikal (Read-Replicas helfen). \\
+\end{tabularx}
+
+% ── ADR-007 ──────────────────────────────────────────────────
+\subsection{ADR-007: Kein Service Mesh in v1.0}
+
+Dieses ADR begründet den bewussten Verzicht auf ein Service Mesh (z.\,B.\ Linkerd oder Istio)
+in der ersten Produktionsversion. Es korrespondiert direkt mit der technischen Schuld TS1 und
+wird in v2.0 durch die Einführung von Linkerd abgelöst.
+
+\begin{tabularx}{\textwidth}{L{3.5cm} X}
+  \rowcolor{tableheader}
+  \color{white}\textbf{Feld} & \color{white}\textbf{Inhalt} \\
+  Status & Akzeptiert -- 2026-02-10 \\
+  \rowcolor{tablegrey}
+  Qualitätsziele & Maintainability (primär); Security (nachrangig) \\
+  Entscheidungstreiber & Geringes Team-Know-how mit Service Mesh; erhöhter Betriebsaufwand für Sidecar-Infrastruktur übersteigt den Nutzen in v1.0; Budget- und Zeitrahmen des MVP. \\
+  \rowcolor{tablegrey}
+  Kontext & Ein Service Mesh ergänzt Kubernetes um mTLS\footnote{%
+    \textit{mTLS (Mutual TLS):} Gegenseitige TLS-Authentifizierung, bei der sich beide Seiten
+    (Client \textit{und} Server) mit einem Zertifikat ausweisen. Im Gegensatz zu einfachem TLS,
+    das nur den Server authentifiziert, stellt mTLS sicher, dass auch der aufrufende Service
+    vertrauenswürdig ist -- ein wichtiges Konzept zur Absicherung der Service-zu-Service-Kommunikation
+    in Microservice-Architekturen.}
+  zwischen Services, L7-Observability und automatisches Retry. Ohne Service Mesh kommunizieren
+  Services intern über unverschlüsseltes HTTP innerhalb des privaten Kubernetes-Netzwerks. \\
+  Entscheidung & Kein Service Mesh in v1.0. Netzwerk-Sicherheit wird durch Kubernetes Network Policies und TLS am API Gateway kompensiert. Tilgung: Linkerd in v2.0 (TS1). \\
+  \rowcolor{tablegrey}
+  Alternativen & (1)~Linkerd -- zurückgestellt auf v2.0: geringerer Overhead als Istio, bevorzugte Option. (2)~Istio -- abgelehnt: zu hohe operative Komplexität für Team-Grösse. \\
+  Konsequenzen & (+)~Reduzierte Betriebskomplexität in v1.0. (+)~Schnellerer MVP-Launch. (-)~Kein mTLS intern (Sicherheitsrisiko TS1). (-)~Eingeschränkte L7-Observability. \\
+\end{tabularx}
+
+% ── ADR-008 ──────────────────────────────────────────────────
+\subsection{ADR-008: Single-Tenant-Architektur in v1.0}
+
+Dieses ADR begründet den bewussten Verzicht auf Multi-Tenancy in der ersten Version.
+Es korrespondiert mit der technischen Schuld TS4 und wird in v2.0 durch ein
+Schema-per-Tenant-Modell abgelöst (vgl.\ Kap.~14.3).
+
+\begin{tabularx}{\textwidth}{L{3.5cm} X}
+  \rowcolor{tableheader}
+  \color{white}\textbf{Feld} & \color{white}\textbf{Inhalt} \\
+  Status & Akzeptiert -- 2026-02-12 \\
+  \rowcolor{tablegrey}
+  Qualitätsziele & Maintainability (primär, kurzfristig); Functional Correctness \\
+  Entscheidungstreiber & Zeitrahmen MVP (6 Monate); Multi-Tenancy erfordert durchgängige \texttt{tenant\_id}-Spalten, separates IdP-Realm und Tenant-Routing -- zu aufwändig für v1.0. Erste Zielgruppe: ein einzelner Kursanbieter (SkillBridge AG). \\
+  \rowcolor{tablegrey}
+  Kontext & Multi-Tenancy bezeichnet die Fähigkeit einer SaaS-Plattform, mehrere Mandanten (Kursanbieter) auf derselben Infrastruktur mit strikter Datentrennung zu betreiben. In v1.0 wird EduPlanner für einen einzigen Kursanbieter betrieben. \\
+  Entscheidung & Single-Tenant-Betrieb in v1.0. Alle Services teilen eine gemeinsame Deployment-Instanz ohne mandantenbezogene Datentrennung. \\
+  \rowcolor{tablegrey}
+  Alternativen & (1)~Schema-per-Tenant von Anfang an -- abgelehnt: zu komplex für MVP-Zeitrahmen. (2)~Database-per-Tenant -- abgelehnt: zu hohe Infrastrukturkosten in v1.0. \\
+  Konsequenzen & (+)~Deutlich vereinfachte Datenbankschicht in v1.0. (+)~Schnellerer MVP-Launch. (-)~Technische Schulden für v2.0 (TS4). (-)~Migration auf Multi-Tenancy erfordert Schema-Änderungen an allen Tabellen (R11). \\
+\end{tabularx}
+
+% ── ADR-009 ──────────────────────────────────────────────────
+\subsection{ADR-009: Outbox Relay -- Technologiewahl}
+
+Dieses ADR spezifiziert die konkrete Implementierung des Relay-Prozesses, der die
+\texttt{outbox}-Tabelle aus ADR-004 ausliest und Events an RabbitMQ publiziert.
+
+\begin{tabularx}{\textwidth}{L{3.5cm} X}
+  \rowcolor{tableheader}
+  \color{white}\textbf{Feld} & \color{white}\textbf{Inhalt} \\
+  Status & Akzeptiert -- 2026-02-15 \\
+  \rowcolor{tablegrey}
+  Qualitätsziele & Functional Correctness (primär), Reliability-Availability \\
+  Entscheidungstreiber & Einfache, wartbare Lösung ohne zusätzliche externe Abhängigkeiten; muss \textit{at-least-once}-Delivery garantieren; muss idempotent konsumierbar sein. \\
+  \rowcolor{tablegrey}
+  Kontext & Der Relay-Prozess ist ein Background-Thread innerhalb jedes Services, der periodisch die \texttt{outbox}-Tabelle nach \texttt{PENDING}-Einträgen abfragt, diese an RabbitMQ sendet und den Status auf \texttt{SENT} setzt. Bei Fehlern nach 5 Versuchen landet das Event in der Dead-Letter-Queue (DLQ). \\
+  Entscheidung & Polling-basierter Relay-Thread (Spring \texttt{@Scheduled}, Intervall 500\,ms) innerhalb jedes Services. Kein separater Prozess, keine externe Abhängigkeit. \\
+  \rowcolor{tablegrey}
+  Alternativen & (1)~Debezium\footnote{\textit{Debezium}: Open-Source-Plattform für Change Data Capture (CDC), die Datenbankänderungen aus dem Transaction Log ausliest und als Events publiziert. Leistungsfähiger als Polling, aber deutlich komplexer im Betrieb.} (CDC) -- zurückgestellt auf v2.0: leistungsfähiger, aber höhere operative Komplexität. (2)~Separater Relay-Service -- abgelehnt: unnötige Infrastruktur für aktuelles Volumen. \\
+  Konsequenzen & (+)~Keine zusätzliche Infrastruktur. (+)~Einfach zu debuggen. (-)~Polling-Latenz ($\leq$\,500\,ms). (-)~Erhöhte DB-Last bei hohem Event-Volumen. \\
+\end{tabularx}
+
+% ── ADR-010 ──────────────────────────────────────────────────
+\subsection{ADR-010: Cloud-Provider -- Microsoft Azure}
+
+Dieses ADR dokumentiert die Wahl von Microsoft Azure als Cloud-Provider für alle
+Produktions- und Staging-Umgebungen von EduPlanner (vgl.\ Kap.~7.1.1).
+
+\begin{tabularx}{\textwidth}{L{3.5cm} X}
+  \rowcolor{tableheader}
+  \color{white}\textbf{Feld} & \color{white}\textbf{Inhalt} \\
+  Status & Akzeptiert -- 2026-02-20 \\
+  \rowcolor{tablegrey}
+  Qualitätsziele & Reliability-Availability (primär), Security, Maintainability \\
+  Entscheidungstreiber & DSGVO/DSG-Compliance mit Datenresidenz Schweiz; Managed Services für PostgreSQL und Kubernetes; bestehendes Team-Know-how mit Azure; Budget $\leq$ CHF~800/Monat. \\
+  \rowcolor{tablegrey}
+  Kontext & EduPlanner muss personenbezogene Daten ausschliesslich in der EU bzw.\ der Schweiz speichern (Kap.~2.3). Nicht alle Cloud-Provider bieten Schweizer Regionen mit vollständigem Managed-Service-Angebot an. \\
+  Entscheidung & Microsoft Azure mit primärer Region \textit{Switzerland North} (Zürich) und Failover-Region \textit{Switzerland West} (Genf). Eingesetzte Managed Services: Azure Kubernetes Service (AKS~1.28+), Azure Database for PostgreSQL~15 Flexible Server, Azure Key Vault, Azure Monitor. \\
+  \rowcolor{tablegrey}
+  Alternativen & (1)~AWS -- abgelehnt: Schweizer Region (\textit{eu-central-2}) verfügbar, aber geringeres Team-Know-how; höhere Migrationskosten. (2)~Google Cloud -- abgelehnt: kein Schweizer Rechenzentrum zum Entscheidungszeitpunkt. (3)~On-Premise -- ausgeschlossen durch Randbedingung (Kap.~2.1). \\
+  Konsequenzen & (+)~Datenresidenz Schweiz erfüllt DSGVO/DSG. (+)~Managed PostgreSQL: automatisches Failover, PITR, integriertes Monitoring. (+)~Team-Know-how reduziert Einarbeitungsaufwand. (-)~Gewisser Vendor Lock-in (mitigiert durch cloud-agnostische Tools: K8s, PostgreSQL, RabbitMQ -- vgl.\ R7). \\
+\end{tabularx}
+
+% ── ADR-011 ──────────────────────────────────────────────────
+\subsection{ADR-011: Contract-First mit OpenAPI~3.1 und Swagger~UI}
+
+Dieses ADR begründet den Contract-First-Ansatz mit OpenAPI~3.1.0 als
+verbindliche Entwicklungsstrategie für alle REST-Schnittstellen von
+EduPlanner sowie die Bereitstellung der interaktiven Swagger~UI pro Service.
+Die konsolidierte Spezifikation liegt in Anhang~D.
+
+\begin{tabularx}{\textwidth}{L{3.5cm} X}
+  \rowcolor{tableheader}
+  \color{white}\textbf{Feld} & \color{white}\textbf{Inhalt} \\
+  Status & Akzeptiert -- 2026-02-22 \\
+  \rowcolor{tablegrey}
+  Qualitätsziele & Maintainability (primär), Functional Correctness, Usability \\
+  Entscheidungstreiber &
+  API-First als verbindliche Randbedingung (Kap.~2.1);
+  vollständige OpenAPI-Dokumentation als Go-Live-Kriterium v1.0 (Kap.~1.1);
+  Contract Testing (TS2) setzt maschinenlesbare Spec voraus;
+  parallele Frontend-/Backend-Entwicklung ohne Warten auf Implementierung. \\
+  \rowcolor{tablegrey}
+  Kontext &
+  Im \emph{Code-First}-Ansatz (z.\,B.\ Springdoc-Annotationen) entsteht
+  die Spec nachgelagert aus dem Code -- sie beschreibt, was implementiert
+  wurde, nicht was vereinbart wurde. Dies führt zu Drift zwischen Spec
+  und Implementierung sowie zu blockierter Frontend-Entwicklung.
+  Im \emph{Contract-First}-Ansatz ist die YAML-Datei die einzige
+  Quelle der Wahrheit: Sie entsteht zuerst, wird in Git versioniert,
+  und Server-Stubs werden daraus generiert. Der Compiler erzwingt
+  Konformität. \\
+  Entscheidung &
+  \textbf{Contract-First} mit OpenAPI~3.1.0 (YAML).
+  Die Datei \texttt{openapi/}\allowbreak \texttt{eduplanner-}\allowbreak \texttt{api.yaml} wird manuell gepflegt.
+  Server-Stubs (Spring-Boot-Interfaces) werden via
+  \texttt{openapi-generator-}\allowbreak\texttt{maven-plugin} generiert
+  (\texttt{interfaceOnly=true},\newline\texttt{useSpringBoot3=true}).
+  Das Dev-Team implementiert ausschliesslich die generierten Interfaces.
+  Jeder Service stellt die interaktive Swagger~UI unter
+  \texttt{/swagger-ui/}\allowbreak\texttt{index.html} bereit
+  (\texttt{springdoc-openapi-}\allowbreak\texttt{starter-webmvc-ui});
+  in Produktion nur aus dem internen Netz erreichbar.
+  Die Spec wird in der CI-Pipeline mit \texttt{vacuum} (Linting) und
+  \texttt{openapi-generator} (Generierbarkeit) validiert --
+  ein ungültiger Vertrag blockiert den Build. \\
+  \rowcolor{tablegrey}
+  Alternativen &
+  (1)~\emph{Code-First / Springdoc:} abgelehnt -- Spec entsteht
+  nachgelagert, Frontend-Entwicklung blockiert, Drift möglich.
+  (2)~\emph{GraphQL:} zurückgestellt auf v2.0 als optionale Schicht
+  neben REST (Kap.~14.3).
+  (3)~\emph{AsyncAPI:} evaluiert für Domain Events (RabbitMQ);
+  zurückgestellt auf v1.1 -- ergänzt OpenAPI, ersetzt es nicht.
+  (4)~\emph{Keine formale Spec:} abgelehnt -- Contract Testing (TS2)
+  und externes Onboarding nicht möglich. \\
+  Konsequenzen &
+  (+)~Spec und Implementierung sind strukturell nie aus dem Sync
+  (Compiler-Enforcement). \newline
+  (+)~Frontend kann mit generierten TypeScript-Clients parallel
+  entwickeln. \newline
+  (+)~Swagger~UI (\texttt{/swagger-ui/index.html}) bietet
+  interaktives API-Testing ohne externes Tool. \newline
+  (+)~Basis für Pact Contract Tests (TS2-Tilgung Sprint~8). \newline
+  (-)~Initiale Spec-Erstellung erfordert Disziplin; kein ``quick
+  and dirty'' Endpoint möglich. \newline
+  (-)~OpenAPI beschreibt nur synchrone REST -- für asynchrone
+  Domain Events ist AsyncAPI ergänzend nötig (v1.1). \\
+\end{tabularx}

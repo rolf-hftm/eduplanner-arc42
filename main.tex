@@ -1,0 +1,130 @@
+\documentclass[a4paper,11pt]{article}
+
+\input{config/preamble}
+
+% ── Bibliographie ────────────────────────────────────────────
+\usepackage[backend=biber, style=alphabetic, sorting=nyt]{biblatex}
+\addbibresource{references/bibliography.bib}
+
+% ── Querformat-Seiten (Anhang B) ─────────────────────────────
+\usepackage{pdflscape}
+
+% ============================================================
+\begin{document}
+% ============================================================
+
+% ── TITELSEITE ───────────────────────────────────────────────
+\thispagestyle{empty}
+\begin{center}
+  \vspace*{3cm}
+  {\sffamily\Huge\bfseries\color{darkblue} SkillBridge AG}\\[0.4cm]
+  {\sffamily\large\color{grey} Aarbergstrasse 46, 2503 Biel/Bienne, Schweiz}\\[1.2cm]
+  {\sffamily\huge\bfseries\color{midblue} EduPlanner}\\[0.3cm]
+  {\sffamily\Large\color{grey} Weiterbildungsplattform für Kursanbieter}\\[0.8cm]
+  {\color{midblue}\rule{12cm}{1.5pt}}\\[0.4cm]
+  {\sffamily\LARGE\bfseries\color{darkblue} arc42 Architekturdokumentation}\\[0.4cm]
+  {\color{midblue}\rule{12cm}{1.5pt}}\\[1.5cm]
+
+  \begin{tabular}{L{4cm} L{9cm}}
+    \rowcolor{tablegrey}
+    \textbf{Version} & 1.0 \\
+    \textbf{Status}  & Freigegeben (Lehrfassung) \\
+    \rowcolor{tablegrey}
+    \textbf{Datum}   & März 2026 \\
+    \textbf{Autor}   & Patrick Hari \\
+    \rowcolor{tablegrey}
+    \textbf{Template} & arc42 Version~9 (Juli 2025) -- \url{https://arc42.org} \\
+    \textbf{Auftraggeber} & SkillBridge AG, Biel/Bienne (fiktiv) \\
+  \end{tabular}
+\end{center}
+
+\vspace{1.5cm}
+\begin{hinweis}[Hinweis -- Fiktives Lehrbeispiel]
+Dieses Dokument dient ausschliesslich Ausbildungszwecken im Modul \emph{Software-Architektur} an der \href{https://www.hftm.ch/de}{Höheren Fachschule für Technik Mittelland}.
+Die Firma SkillBridge AG sowie das Produkt EduPlanner sind vollständig fiktiv.
+Jegliche Ähnlichkeit mit realen Unternehmen oder Produkten ist rein zufällig.
+Erstellt nach dem arc42-Template -- \url{https://arc42.org}
+\newline
+\newline
+Begriffe, Konzepte und Entscheidungen werden
+teilweise ausführlicher erläutert, als es in einem reinen
+Projektdokument üblich wäre -- insbesondere durch erklärende
+Fussnoten und konkrete Beispiele. In einem produktiven
+Projektkontext können diese Passagen zugunsten der Kürze
+reduziert werden.
+\newline
+\newline
+Konzipiert und verfasst wurde das Beispiel von \textbf{Rolf Jufer}
+(\href{mailto:rolf.jufer@hftm.ch}{rolf.jufer@hftm.ch}).
+\end{hinweis}
+
+
+\newpage
+
+% ── REVISIONSHISTORIE ─────────────────────────────────────────
+\section*{Revisionshistorie}
+\addcontentsline{toc}{section}{Revisionshistorie}
+\begin{tabularx}{\textwidth}{C{1.5cm} C{2.2cm} L{3.5cm} X}
+  \rowcolor{tableheader}
+  \color{white}\textbf{Version} & \color{white}\textbf{Datum} & \color{white}\textbf{Autor} & \color{white}\textbf{Änderung} \\
+  0.1  & 2026-01-15 & Patrick Hari & Initiale Erstellung \\
+  \rowcolor{tablegrey}
+  0.2  & 2026-01-28 & Patrick Hari & Kontextdiagramme \\
+  0.3  & 2026-02-01 & Patrick Hari / Thomas Zbinden & Bounded Contexts, ADRs \\
+  \rowcolor{tablegrey}
+  0.4  & 2026-02-10 & Patrick Hari & restliche Kapitel \\
+  \rowcolor{tablegrey}
+  1.0  & 2026-03-04 & Sandra Meier  & Review und Freigabe Version 1.0 \\
+\end{tabularx}
+
+\vspace{0.5cm}
+\begin{hinweis}[Fiktive Personas]
+Alle genannten Personen (Sandra Meier, Thomas Zbinden, Patrick Hari, Andrea Senn u.\,a.),
+Budgetangaben und Entscheidungen dienen ausschliesslich der Illustration im Rahmen der HFTM Grenchen.
+\end{hinweis}
+
+\newpage
+\tableofcontents
+\newpage
+
+% ── KAPITEL ──────────────────────────────────────────────────
+\input{chapter/01_introduction_and_goals}
+\newpage
+\input{chapter/02_constraints}
+\newpage
+\input{chapter/03_context_and_scope}
+\newpage
+\input{chapter/04_solution_strategy}
+\newpage
+\input{chapter/05_building_block_view}
+\newpage
+\input{chapter/06_runtime_view}
+\newpage
+\input{chapter/07_deployment_view}
+\newpage
+\input{chapter/08_crosscutting_concepts}
+\newpage
+\input{chapter/09_adrs}
+\newpage
+\input{chapter/10_quality_requirements}
+\newpage
+\input{chapter/11_risks_and_technical_debt}
+\newpage
+\input{chapter/12_glossary}
+\newpage
+\input{chapter/13_operation_and_deployment_runbook}
+\newpage
+\input{chapter/14_roadmap_and_evolution}
+\newpage
+
+% ── ANHANG & REFERENZEN ───────────────────────────────────────
+\appendix
+\input{appendix/event_storming}
+\newpage
+\input{appendix/diagrams_landscape}
+\newpage
+\input{appendix/openapi}
+\newpage
+\printbibliography[title={Literaturverzeichnis}, heading=bibintoc]
+
+\end{document}

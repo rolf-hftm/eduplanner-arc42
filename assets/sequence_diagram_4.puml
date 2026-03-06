@@ -1,0 +1,58 @@
+@startuml PublishCourseSequenceDiagram
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam sequenceArrowColor #333333
+skinparam sequenceLifeLineBorderColor #333333
+skinparam sequenceLifeLineBackgroundColor #FFFFFF
+skinparam participantBackgroundColor #FFFFFF
+skinparam participantBorderColor #333333
+skinparam actorBackgroundColor #FFFFFF
+skinparam actorBorderColor #333333
+skinparam sequenceGroupBorderColor #999999
+skinparam sequenceGroupBackgroundColor #F5F5F5
+skinparam sequenceGroupBodyBackgroundColor #FAFAFA
+skinparam noteBorderColor #999999
+skinparam noteBackgroundColor #FFFFFF
+skinparam fontSize 11
+skinparam fontName Helvetica
+
+actor Admin as A
+participant "API Gateway" as GW
+participant "course-Service" as CS
+participant "identity-Service" as IS
+participant "OutboxPublisher" as OP
+participant "Outbox-Relay" as OR
+participant "Message Broker" as MB
+
+A -> GW : PUT /api/v1/courses/{id}/publish + JWT
+
+group Token-Validierung
+  GW -> GW : prüft Token-Signatur
+  alt Ungültiger Token
+    GW --> A : 401 Unauthorized
+  end
+end
+
+GW -> CS : Weiterleitung Request
+
+group Rollenverifikation
+  CS -> IS : prüfe Rolle (userId)
+  alt Keine ADMIN-Rolle
+    IS --> CS : 403 Forbidden
+    CS --> A : 403 Forbidden
+  end
+  IS --> CS : ADMIN ✓
+end
+
+group Publizierung [DB-Transaktion]
+  CS -> CS : CourseStatus: DRAFT → PUBLISHED
+  CS -> OP : schreibe CoursePublished\nin outbox-Tabelle
+  OP --> CS : ✓
+end
+
+CS --> A : 200 OK
+
+note over OR, MB : asynchron
+OR -> MB : publiziere CoursePublished
+
+@enduml

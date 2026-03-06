@@ -1,0 +1,43 @@
+@startuml SchedulingClassDiagram
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam classBackgroundColor #E8F4F8
+skinparam classBorderColor #333333
+skinparam classArrowColor #333333
+skinparam linetype ortho
+skinparam fontSize 11
+skinparam fontName Helvetica
+
+package "scheduling Service" {
+  class SchedulingController
+  class SchedulingService
+  class CourseExecution <<AggregateRoot>>
+  class CourseRef <<ValueObject>>
+  class ExecutionSlot <<ValueObject>>
+  class ExecutionStatus <<ValueObject>>
+  class TrainerAvailabilityChecker
+  interface ExecutionRepository <<Port>>
+  class ExecutionRepositoryJPA
+  class AntiCorruptionLayer
+  class OutboxPublisher
+  class CourseExecutionScheduled <<Event>>
+  class CourseExecutionPublished <<Event>>
+  class CourseExecutionCancelled <<Event>>
+
+  SchedulingController --> SchedulingService
+  SchedulingService --> ExecutionRepository
+  SchedulingService --> TrainerAvailabilityChecker
+  SchedulingService --> OutboxPublisher
+  SchedulingService --> AntiCorruptionLayer
+  SchedulingService --> CourseExecution
+  CourseExecution --> CourseRef
+  CourseExecution --> ExecutionSlot
+  CourseExecution --> ExecutionStatus
+  ExecutionRepositoryJPA ..|> ExecutionRepository
+  TrainerAvailabilityChecker --> ExecutionRepository
+  OutboxPublisher --> CourseExecutionScheduled
+  OutboxPublisher --> CourseExecutionPublished
+  OutboxPublisher --> CourseExecutionCancelled
+}
+
+@enduml
